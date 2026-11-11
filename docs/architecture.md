@@ -290,3 +290,12 @@ R1 ~ R12 (아래 4장)
 - **R3**: `CheckoutRepositoryImpl.save`의 `case CARD:` 뒤 주석 `// break;`(throw 뒤라 도달 불가)는 남겨둠. L5/B9 때 정리.
 - **R3 → R6 참고**: `CashPaymentRow.getChangeCash`의 "현금이 아니면 null" 분기는 `save`의 `case CASH`에서만 호출되므로 도달 불가. R6에서 거스름돈 계산을 옮길 때 이 분기는 없애도 동작이 같다.
 - **라인 번호**: 배치 1 이후 2~4장의 라인 번호가 일부 어긋남 (`CartServiceImpl`, `CartRepositoryImpl`, `CheckoutRepositoryImpl`). 다음 배치 전에 근거 라인을 다시 확인할 것.
+
+## 7. 진행 현황
+
+| 순서 | 항목 | 커밋 | 비고 |
+|---|---|---|---|
+| 1 | R1 죽은 코드 제거 | `6df59ec` | |
+| 2 | R2 거래 키 추출 | `870e6a0` | |
+| 3 | R3 enum 비교 | `d25853f` | |
+| 4 | R4 죽은 판정 제거 | `c5d2bd7` | |
