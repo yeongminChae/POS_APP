@@ -47,11 +47,16 @@ public class CashPayment implements Payment {
         return CashPayment.builder()
                 .commonPayment(commonPayment)
                 .amountReceived(amountReceived)
-                .change(amountReceived.subtract(commonPayment.getAmountDueToPay()))
+                .change(calculateChange(amountReceived, commonPayment.getAmountDueToPay()))
                 // 현금 거래일 경우 바로 승인 처리
                 .status(PaymentEnums.PaymentStatus.APPROVED)
                 .build();
 
+    }
+
+    // 거스름돈 = 받은 금액 - 결제할 금액 (Row/DTO 도 이 계산을 사용)
+    public static BigDecimal calculateChange(BigDecimal amountReceived, BigDecimal amountDue) {
+        return amountReceived.subtract(amountDue);
     }
 
     public Payment refundOf(BigDecimal amountReceived) {
