@@ -51,8 +51,6 @@ public class CheckoutRepositoryImpl implements CheckoutRepository {
 
                 case CARD:
                     throw new UnsupportedOperationException("CARD 결제는 아직 미지원");
-
-//                    break;
             }
 
         }
