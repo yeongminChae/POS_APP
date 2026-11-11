@@ -553,6 +553,31 @@ flowchart LR
 - B7: 복원한 `CommonPaymentData`에 `paymentId`를 채우지만, 응답·TR_JSON에는 노출하지 않는다 (계획대로)
 - 계획에 없는 테스트 기대값 변경: **없음**
 
+| 순서 | 항목 | 커밋 | 비고 |
+|---|---|---|---|
+| 4 | B2 반품 금액 | `b602c7f` | `fullScenario` 반품 금액 −10500 / −10500 / 0 |
+| 5 | N1 반품 시각·키 | `f34af74` | 신규 `refund_hasOwnApprovedAtAndKey` |
+| 6 | B8 반품 거래 조회 (+N2, N3) | `3423fa8` | `callRefundTransaction_throws` → `callRefundTransaction_returnsRefund` |
+| 7 | B3 받은 금액 부족 거절 | `7185380` | `insufficientCash_isApproved` → `insufficientCash_isRejected`, 신규 `exactCash_isApproved` |
+
+### 배치 2 메모
+
+- 테스트: 28개 → **30개**(스킵 0). 늘어난 2개는 `refund_hasOwnApprovedAtAndKey`, `exactCash_isApproved`
+- 실패 테스트가 빨간 이유
+  - B2: 반품 응답의 청구액이 `10500`(양수)
+  - N1: 반품 응답의 `approvedAt`이 원거래 시각(`2000-01-01 00:00:00`으로 조작해 둔 값)
+  - B8: 조회 시 `IllegalArgumentException("지불 금액이 이상 합니다...")`
+  - B3: 예외가 나지 않음. 경계값 `exactCash_isApproved`(받은 금액 = 결제액)는 수정 전후 모두 초록 — 경계를 지키는 보호 테스트라 의도한 것
+- **B2·N1 구현**: 반품 결제의 `CommonPaymentData`는 `refundOf(CartKey 반품키)`로 새로 만든다 (반품 키, 현재 시각, 청구액 음수, `paymentId` null). `Payment.refund`의 시그니처가 `refund(환불액, 반품 키)`로 바뀜. B2 커밋에서 임시로 넣은 `CommonPaymentData`의 `toBuilder`는 N1 커밋에서 다시 뺐다
+- **B8 구현**
+  - 결제: `CashPayment.restoredOf`(저장된 받은 금액·거스름돈·**상태**를 그대로 사용, 검증 없음). 지금까지 복원 결제의 상태는 항상 `APPROVED`였다
+  - 합계(N2): `SaleRowMapper.toSale`에서 `CartSummary.restoredOf`로 `SALES.TOTAL_QTY`·`TOTAL_AMOUNT`를 사용. 키·라인은 서비스가 만든 요약 그대로
+  - `origSaleId`(N3, Q5): `SALES.ORIG_SALE_ID`로 `RefundDetail.restoredOf(원거래 ID)`를 복원하고, `SaleResDto.of`가 `refundDetail`에서 `origSaleId`를 채운다
+- **계획과 달라진 점 (B8 영향 파일)**: N3를 넣으면서 계획의 영향 파일 목록에 없던 `domain/dto/sale/SaleResDto.java`, `domain/model/sale/RefundDetail.java`를 수정했다. 반대로 계획에 있던 `CheckoutRepository`는 손대지 않았다 (합계 복원을 `SaleRowMapper`에서 처리)
+- **정리 후보 (refactor)**: B8 이후 `SaleResDto.of`가 `origSaleId`를 직접 채우므로, 반품 흐름의 `saleResDto.withOriginSaleId(sale.getSaleId())`(`CheckoutServiceImpl.refundTransaction`)는 같은 값을 한 번 더 넣는 중복 코드다. 동작에 영향이 없어 남겨둠
+- **운영 데이터**: 운영 DB의 기존 반품 1건(SALE_ID 3)은 이제 조회되지만, 저장된 옛 값(받은 금액 −300000, 거스름돈 −374600, 청구액 +74600)이 그대로 보인다 (8장 E3). 보정은 하지 않음
+- 계획에 없는 테스트 기대값 변경: **없음**
+
 ## 8. 실험 기록
 
 실험은 `e425ae0` 기준으로 임시 테스트 클래스(`src/test/java/.../experiment/`)를 만들어 실행했고, 끝난 뒤 삭제했다 (커밋하지 않음). 운영 DB 조회는 `sqlite3 -readonly`(`mode=ro`)로만 했다.
