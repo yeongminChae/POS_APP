@@ -32,9 +32,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
     @Override
     public CartSummary getSaleSummary(PaymentReqDto paymentReq) {
-        Cart cart = cartService.getCurrentCart(paymentReq.getKey());
-
-        return CartSummary.of(cart);
+        return CartSummary.of(getCurrentCart(paymentReq));
     }
 
     @Override
@@ -104,19 +102,22 @@ public class CheckoutServiceImpl implements CheckoutService {
         return cartSummary.refundOf(refundedCart, cartKey);
     }
 
+    // 카트는 한 번만 조회해서 요약·결제액 계산에 함께 사용
     private Sale saleModelBuilder(PaymentReqDto paymentReq) {
-        CartSummary cartSummary = getSaleSummary(paymentReq);
-        Payment cashPayment = getPaymentSummary(paymentReq);
+        Cart cart = getCurrentCart(paymentReq);
+
+        CartSummary cartSummary = CartSummary.of(cart);
+        Payment cashPayment = getPaymentSummary(paymentReq, cart.getTotalAmountInLines());
 
         return Sale.of(cartSummary, cashPayment);
     }
 
-    private Payment getPaymentSummary(PaymentReqDto paymentReq) {
+    private Payment getPaymentSummary(PaymentReqDto paymentReq, BigDecimal amountDueToPay) {
 
         switch (paymentReq.getPaymentMethod()) {
             case CASH:
                 return CashPayment.of(
-                        getCommonPaymentData(paymentReq),
+                        CommonPaymentData.of(paymentReq, amountDueToPay),
                         paymentReq.getAmountReceived()
                 );
 
@@ -126,14 +127,6 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         return null;
 
-    }
-
-    private CommonPaymentData getCommonPaymentData(PaymentReqDto paymentReq) {
-        return CommonPaymentData.of(paymentReq, getAmountDueToPay(paymentReq));
-    }
-
-    private BigDecimal getAmountDueToPay(PaymentReqDto paymentReq) {
-        return getCurrentCart(paymentReq).getTotalAmountInLines();
     }
 
     private Cart getCurrentCart(PaymentReqDto paymentReq) {
