@@ -1,14 +1,13 @@
 package com.toyproject.pos.domain.model.sale;
 
+import com.toyproject.pos.common.util.DateFormatUtil;
 import com.toyproject.pos.domain.model.cart.CartSummary;
 import com.toyproject.pos.domain.model.payment.Payment;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.Instant;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 
 @Getter
 @AllArgsConstructor
@@ -63,16 +62,9 @@ public class Sale {
 
     private static String getReceiptNo(CartSummary cartSummary) {
         return cartSummary.getStrCd()
-                + "-" + getDateFormat()
+                + "-" + DateFormatUtil.nowDate(ZoneId.systemDefault())
                 + "-" + cartSummary.getPosNo()
                 + "-" + cartSummary.getTranNo()
-                ;
-    }
-
-    private static String getDateFormat() {
-        return DateTimeFormatter.ofPattern("yyyyMMdd")
-                .withZone(ZoneId.systemDefault())
-                .format(Instant.now())
                 ;
     }
 

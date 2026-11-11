@@ -1,5 +1,6 @@
 package com.toyproject.pos.domain.model.payment;
 
+import com.toyproject.pos.common.util.DateFormatUtil;
 import com.toyproject.pos.domain.dto.payment.request.PaymentReqDto;
 import com.toyproject.pos.domain.model.cart.CartKey;
 import lombok.AllArgsConstructor;
@@ -7,9 +8,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 
 @Getter
 @AllArgsConstructor
@@ -41,12 +40,7 @@ public class CommonPaymentData {
     }
 
     private static String dateTimeFormat() {
-        return DateTimeFormatter
-                .ofPattern("yyyy-MM-dd HH:mm:ss")
-                .withZone(ZoneId.of("Asia/Seoul"))
-                .format(Instant.now())
-                ;
-
+        return DateFormatUtil.nowDateTime(ZoneId.of("Asia/Seoul"));
     }
 
 }

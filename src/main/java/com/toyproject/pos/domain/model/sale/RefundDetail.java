@@ -1,12 +1,11 @@
 package com.toyproject.pos.domain.model.sale;
 
+import com.toyproject.pos.common.util.DateFormatUtil;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.Instant;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 
 @Getter
 @AllArgsConstructor
@@ -21,16 +20,9 @@ public class RefundDetail {
         return RefundDetail.builder()
                 .origSaleId(sale.getSaleId())
                 .origReceiptNo(sale.getReceiptNo())
-                .refundedAt(getDateFormat())
+                .refundedAt(DateFormatUtil.nowDate(ZoneId.systemDefault()))
                 .reason("개인사유")
                 .build();
-    }
-
-    private static String getDateFormat() {
-        return DateTimeFormatter.ofPattern("yyyyMMdd")
-                .withZone(ZoneId.systemDefault())
-                .format(Instant.now())
-                ;
     }
 
 }
