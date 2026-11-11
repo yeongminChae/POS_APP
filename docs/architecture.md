@@ -308,6 +308,8 @@ R1 ~ R12 (아래 4장)
 | 10 | R10 거래 복원 중복 제거 | `b6de112` | `CheckoutServiceImpl.loadTransaction` |
 | 11 | R12 판매 조립 서비스 이동 | `e53ccf5` | `getTransaction(CartKey, CartSummary, Payment)` |
 | 12 | R11 일괄 등록 서비스 이동 | `9fd71ef` | `CartService.addItems`, `CartController.toAddItemResponse` |
+| 13 | 잔여 정리: `RefundReqDto.getKey()` (D1 마무리) | `b1050f1` | `CheckoutServiceImpl.refundTransaction` 호출부 단순화 |
+| 14 | 잔여 정리: `CheckoutRepositoryImpl.save`의 도달 불가 `// break;` 제거 | `7da8855` | |
 
 ### 배치 2 (R7 → R6 → R8 → R5) 계획 수정 사항 / 메모
 
@@ -333,3 +335,10 @@ R1 ~ R12 (아래 4장)
 - **R11**: 일괄 등록은 기존처럼 실패해도 나머지를 계속 시도(단락 평가 없음), 빈 목록이면 성공. HTTP 200 고정 + 바디 status 404 구조는 그대로(A4에서 변경).
 - **해결된 문제점**: D5, D6, D7, D8, D9, D10, L1, L3, L4 (D1은 `RefundReqDto` 1곳 남음, D2·D3은 공식·포맷 단일화 완료 / 타임존 차이는 B15).
 - **남은 비(非)버그 정리 후보**: L2(`CartController` 빈 TODO — A6에서 제거), L5(결제 수단별 저장 정책 — B9/카드 구현 때), T3(afterCommit 익명 클래스 — B1 때), `CheckoutRepositoryImpl.save`의 도달 불가 `// break;`.
+
+### 잔여 정리 (13 → 14) 메모
+
+- **13**: `RefundReqDto`에 `getKey()` 위임 메서드 추가(R2와 같은 방식), `refundTransaction`의 `getCartInfoReqDto().getKey()` 제거 → D1 완전 해결. 기존 `getRefundInfoKey()`(원거래 키)는 그대로.
+- **14**: `case CARD:`의 throw 뒤 주석 `// break;` 제거. 분기 동작은 그대로(L5/B9는 여전히 남음).
+- 두 커밋 모두 `./gradlew test` 27개 중 26개 통과, 1개 스킵(`refund_isNotAtomic` @Disabled), 실패 0.
+- **남은 비(非)버그 정리 후보**: L2(빈 TODO — A6 때 처리), L5(B9 때), T3(B1 때).
