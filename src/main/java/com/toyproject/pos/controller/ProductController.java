@@ -14,9 +14,4 @@ public class ProductController {
 
     private final ProductService productService;
 
-//    @GetMapping("/{barcode}")
-//    public Map<String, ProductQueryDto> getProductByBarcode(@PathVariable String barcode) {
-//        return productService.findProduct(barcode);
-//    }
-
 }

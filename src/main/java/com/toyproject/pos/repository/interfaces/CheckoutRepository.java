@@ -9,8 +9,6 @@ public interface CheckoutRepository {
 
     Long save(Sale sale);
 
-//    Sale getTransaction(CartKey cartKey);
-
     Sale getTransaction(CartKey cartKey, Cart cart, Payment payment);
 
     Cart getCart(CartKey cartKey);

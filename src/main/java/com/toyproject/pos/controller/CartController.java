@@ -4,7 +4,6 @@ import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.product.request.ProductReqDto;
 import com.toyproject.pos.domain.dto.response.ApiResponseDto;
 import com.toyproject.pos.domain.model.cart.Cart;
-import com.toyproject.pos.domain.model.cart.CartKey;
 import com.toyproject.pos.service.interfaces.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

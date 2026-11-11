@@ -1,7 +1,6 @@
 package com.toyproject.pos.controller;
 
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
-import com.toyproject.pos.domain.dto.payment.request.CardReqDto;
 import com.toyproject.pos.domain.dto.payment.request.PaymentReqDto;
 import com.toyproject.pos.domain.dto.payment.request.RefundReqDto;
 import com.toyproject.pos.domain.dto.sale.SaleResDto;
