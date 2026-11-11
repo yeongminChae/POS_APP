@@ -453,7 +453,7 @@ flowchart LR
 | **0. 사전 실험** | E1 → E2 → E3 → E4 | 실험 4개, 결과를 8장에 기록 | `docs` 커밋 1개 (+필요시 `chore` 설정 커밋) | — |
 | **1. 저장 기반** | 1 | B7 결제 ID 연결 | fix | 중 |
 | | 1-1 | POS 2대 동시 결제·반품 테스트 (5.1절) | test | 하 |
-| | 1-2 | (E2에서 BUSY 재현 시) IMMEDIATE + busy_timeout 설정 | chore | 중 |
+| | 1-2 | IMMEDIATE + busy_timeout=5000 설정 (E2에서 BUSY 재현 → 확정) | chore | 중 |
 | | 2 | B6 반품 트랜잭션 (`refund_isAtomic` 활성화) | fix | 하 |
 | | 3 | B16 TR_JSON saleId | fix | 하 |
 | **2. 금액** | 4 | B2 반품 금액 | fix | 중 |
@@ -469,7 +469,7 @@ flowchart LR
 | **4. 재고·정합성** | 12 | B12a 재고 차감·복원 | fix | 상 |
 | | 13 | B12b 판매중지 거절 | fix | 중 |
 | | 14 | B10 예외 전파 | fix | 하 |
-| | 15 | T2 조회 트랜잭션 (E1·E2 결과에 따라 진행/보류) | fix | 하 |
+| | 15 | ~~T2 조회 트랜잭션~~ → 보류 (8장 E1·E2) | — | — |
 | **5. P2** | 16 | B14a 반품 사유 | fix | 하 |
 | | 17 | B15 타임존 | fix | 하 |
 | | 18 | N4 `JournalDataRow` 죽은 필드 제거 | refactor | 하 |
@@ -535,7 +535,74 @@ flowchart LR
 
 ## 8. 실험 기록
 
-(E1~E4 결과를 여기에 기록)
+실험은 `e425ae0` 기준으로 임시 테스트 클래스(`src/test/java/.../experiment/`)를 만들어 실행했고, 끝난 뒤 삭제했다 (커밋하지 않음). 운영 DB 조회는 `sqlite3 -readonly`(`mode=ro`)로만 했다.
+
+### E1 — readOnly (sqlite-jdbc 3.46.0.0, Hikari, Spring `TransactionTemplate`)
+
+| 설정 | `con.setReadOnly(true)` 직접 호출 | Spring readOnly 트랜잭션 | 이후 일반 쓰기 트랜잭션 |
+|---|---|---|---|
+| 기본 URL | `SQLException: Cannot change read-only flag after establishing a connection` | **조용히 무시됨**: `isReadOnly=false`, `PRAGMA query_only=0`, UPDATE 허용, 커밋 성공 | 정상 |
+| `jdbc.explicit_readonly=true` | `SQLException: Cannot change Read-Only status ... the first statement was already executed` | **트랜잭션 전체 실패**: 첫 쿼리에서 `cannot upgrade to write transaction` | 정상 |
+
+결론: **readOnly는 어느 설정으로도 쓸 수 없다.** 기본 설정에서는 효과가 없고, `explicit_readonly`를 켜면 읽기 트랜잭션이 깨진다. → T2를 진행하더라도 `@Transactional(readOnly = true)`는 쓰지 않는다 (3장 E1 표의 (a)).
+
+### E2 — 잠금 (순수 JDBC, 연결 여러 개, 같은 DB 파일)
+
+시나리오 1: A가 읽은 뒤(반품의 원거래 복원) B가 쓰고(다른 POS 결제), A가 쓰기를 시도
+
+| 모드 | 결과 |
+|---|---|
+| DELETE + DEFERRED (현재 기본, busy_timeout 3000) | A의 UPDATE가 **2ms 만에** `[SQLITE_BUSY] database is locked` |
+| DELETE + DEFERRED + busy_timeout 10000 | **0ms 만에** 같은 오류 — busy_timeout을 늘려도 기다리지 않음 (교착 회피로 즉시 실패) |
+| WAL + DEFERRED | B 커밋 후 A가 **0ms 만에** `[SQLITE_BUSY_SNAPSHOT]` |
+
+시나리오 2: 스레드 4개(2개는 "읽기 → 쓰기 2건", 2개는 "쓰기 2건만"), 각 200회 반복
+
+| 모드 | 성공 | 실패 | 최대 소요 |
+|---|---|---|---|
+| DELETE + DEFERRED (현재 기본) | 776 | **24** (전부 읽기→쓰기, `SQLITE_BUSY`) | 202ms |
+| DELETE + IMMEDIATE + busy_timeout 5000 | **800** | **0** | 3ms |
+| WAL + DEFERRED | 498 | **302** (읽기→쓰기, `SQLITE_BUSY` 292 + `SQLITE_BUSY_SNAPSHOT` 10) | 38ms |
+| WAL + IMMEDIATE + busy_timeout 5000 | **800** | **0** | 91ms |
+
+추가 확인
+- 운영 DB 저널 모드: `delete`
+- 기존 테스트 전체를 `transaction_mode=IMMEDIATE&busy_timeout=5000` URL로 실행(`SPRING_DATASOURCE_URL` 환경변수로 덮어씀): **27개 중 26 통과, 1 스킵, 실패 0** → 설정 변경만으로 기존 동작이 바뀌지 않음
+- "쓰기만" 하는 트랜잭션(지금의 결제)은 어떤 모드에서도 실패하지 않았다. 실패는 **읽은 뒤 쓰는 트랜잭션**에서만 났다. 지금 코드에는 그런 트랜잭션이 없고(반품이 트랜잭션 밖), B6·B4 이후 생긴다
+
+결론: **`SQLITE_BUSY`가 재현됐다.** 5.1절의 조건대로 B6 앞에 설정 커밋을 넣는다.
+- 값: `transaction_mode=IMMEDIATE&busy_timeout=5000`. 저널 모드는 운영과 같은 `delete`를 유지 (WAL은 이 실험에서 이점이 없었고, 네트워크 드라이브에서 쓸 수 없음)
+- IMMEDIATE에서는 조회 트랜잭션도 쓰기 잠금을 잡으므로 **T2는 보류** (5.1절)
+
+### E3 — 운영 결제 ID (레포 밖 운영 SQLite 파일 `PRODUCT_MST`)
+
+- 현금인데 상세 없음 **0건**, 상세가 엉뚱한 결제에 붙음 **0건** → B7은 코드만 고치면 됨
+- 운영 데이터는 SALES 2건뿐: SALE_ID 1(정상, 74600원, 300000원 받음)과 3(1의 반품). ID 2는 모든 테이블에서 비어 있음 (sqlite_sequence는 3 — 과거에 지워진 것으로 보임)
+- 운영의 반품 행(SALE_ID 3)에 버그가 그대로 남아 있다
+  - B2: `AMOUNT_RECEIVED = -300000`, `CHANGE = -374600`, `PAYMENTS.AMOUNT_DUE_TO_PAY = 74600`(양수)
+  - N1: 반품 `APPROVED_AT`이 원거래와 같은 `2025-10-08 17:36:42`
+  - B4: 원거래(SALE_ID 1) 상태 `NORMAL`
+- **영향**: B2·B8 이후 이 반품을 조회하면 저장된 값(거스름돈 −374600)이 그대로 보인다. 운영 데이터 보정은 범위 밖이라 그대로 두고, 필요하면 별도로 보정한다 (예: 반품 행 3건 UPDATE, 원거래 상태 REFUNDED)
+
+### E4 — 운영 재고·상품 상태
+
+- 재고 행 없는 상품 **0건**, 상품 없는 재고 행 **0건** (상품·재고 각 120,000건) → B12a에서 "갱신 0행"은 **예외로 처리**한다 (정상 데이터에서는 나올 수 없으므로)
+- 음수 재고 **0건**, 최소 0, 최대 1985
+- 바코드 중복·NULL **0건** → 바코드 기준 재고 갱신(B12a) 가능
+- 상품 상태: `normal` 50,437 / `discontinued` **35,282 (29%)** / `suspend_order` 34,281 / NULL 0
+  - ⚠️ **B12b를 적용하면 전체 상품의 29%를 담을 수 없게 된다.** 시연에 쓸 바코드가 `discontinued`가 아닌지 확인 필요
+- 성인 전용 7,585건 (B12c 보류와 무관하게 참고)
+
+### 실험 결과로 바뀐 계획
+
+| 항목 | 변경 |
+|---|---|
+| 배치 1 | 1-2 설정 커밋(`chore(db): SQLite 트랜잭션 모드 IMMEDIATE 및 busy_timeout 설정`)을 **넣는 것으로 확정**. 값은 `transaction_mode=IMMEDIATE&busy_timeout=5000` |
+| T2 | **보류 확정** (readOnly 불가 + IMMEDIATE에서 조회도 쓰기 잠금) |
+| B7 | 운영 데이터 보정 불필요 |
+| B12a | INVENTORY 갱신 행이 0이면 예외 |
+| B12b | 진행 전에 시연용 상품 상태를 확인 (29%가 `discontinued`) |
+| B2·B8 | 운영의 기존 반품 1건은 옛 값으로 남음 — 보정은 별도 판단 |
 
 ## 9. 메모: SQLite 동시성 한계와 PostgreSQL 전환 시 바뀌는 점
 
