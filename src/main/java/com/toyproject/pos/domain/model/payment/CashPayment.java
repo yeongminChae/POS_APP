@@ -55,6 +55,21 @@ public class CashPayment implements Payment {
 
     }
 
+    // DB 조회 결과로 복원: 저장된 값을 그대로 사용 (생성 시 검증을 다시 하지 않음 — 반품은 받은 금액이 음수)
+    public static Payment restoredOf(
+            CommonPaymentData commonPayment,
+            BigDecimal amountReceived,
+            BigDecimal change,
+            PaymentEnums.PaymentStatus status
+    ) {
+        return CashPayment.builder()
+                .commonPayment(commonPayment)
+                .amountReceived(amountReceived)
+                .change(change)
+                .status(status)
+                .build();
+    }
+
     // 거스름돈 = 받은 금액 - 결제할 금액 (Row/DTO 도 이 계산을 사용)
     public static BigDecimal calculateChange(BigDecimal amountReceived, BigDecimal amountDue) {
         return amountReceived.subtract(amountDue);

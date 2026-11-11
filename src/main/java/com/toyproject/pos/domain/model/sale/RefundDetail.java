@@ -16,6 +16,13 @@ public class RefundDetail {
     private final String refundedAt;         // 환불 시각(서버 기준)
     private final String reason;              // 선택
 
+    // DB 조회 결과로 복원 (SALES 에는 원거래 ID만 저장됨)
+    public static RefundDetail restoredOf(Long origSaleId) {
+        return RefundDetail.builder()
+                .origSaleId(origSaleId)
+                .build();
+    }
+
     public static RefundDetail of(Sale sale) {
         return RefundDetail.builder()
                 .origSaleId(sale.getSaleId())

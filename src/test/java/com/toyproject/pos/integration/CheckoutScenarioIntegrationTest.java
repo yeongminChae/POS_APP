@@ -188,15 +188,24 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 반품 거래는 조회할 수 없다 — 음수 받은금액 검증에 걸려 500")
-    void callRefundTransaction_throws() throws Exception {
-        String tranNo = paidSale(CHIPS);
+    @DisplayName("반품 거래도 조회된다 — 저장된 결제 상태·금액과 합계로 복원")
+    void callRefundTransaction_returnsRefund() throws Exception {
+        String tranNo = paidSale(CHIPS); // 1500원, 10000원 받음
         String refundTranNo = newTranNo();
         refund(POS_1, refundTranNo, POS_1, tranNo);
 
-        assertThatThrownBy(() -> callTransaction(POS_1, refundTranNo))
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .hasRootCauseMessage("지불 금액이 이상 합니다. 확인 부탁 드립니다.");
+        JsonNode called = json(callTransaction(POS_1, refundTranNo));
+
+        assertThat(called.get("saleStatus").asText()).isEqualTo("REFUNDED");
+        assertThat(called.get("tranNo").asText()).isEqualTo(refundTranNo);
+        assertThat(called.get("origSaleId").asLong()).isEqualTo(saleId(POS_1, tranNo));
+        assertThat(called.at("/payment/status").asText()).isEqualTo("REFUNDED");
+        assertThat(amt(called.at("/payment/amountDueToPay"))).isEqualByComparingTo("-1500");
+        assertThat(amt(called.at("/payment/cash/amountReceived"))).isEqualByComparingTo("-1500");
+        assertThat(amt(called.at("/payment/cash/change"))).isEqualByComparingTo("0");
+        assertThat(called.at("/cart/totalQty").asInt()).isEqualTo(-1);
+        assertThat(amt(called.at("/cart/totalAmount"))).isEqualByComparingTo("-1500");
+        assertThat(called.at("/cart/lines/0/itemStatus").asText()).isEqualTo("REFUNDED");
     }
 
     @Test

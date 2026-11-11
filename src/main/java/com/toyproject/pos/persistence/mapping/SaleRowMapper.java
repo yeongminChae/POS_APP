@@ -7,6 +7,7 @@ import com.toyproject.pos.domain.model.cart.CartSummary;
 import com.toyproject.pos.domain.model.payment.CashPayment;
 import com.toyproject.pos.domain.model.payment.CommonPaymentData;
 import com.toyproject.pos.domain.model.payment.Payment;
+import com.toyproject.pos.domain.model.sale.RefundDetail;
 import com.toyproject.pos.domain.model.sale.Sale;
 import com.toyproject.pos.persistence.row.CashPaymentRow;
 import com.toyproject.pos.persistence.row.PaymentRow;
@@ -34,10 +35,18 @@ public final class SaleRowMapper {
                 .tranNo(saleRow.getTranNo())
                 .cashier(saleRow.getCashier())
                 .saleStatus(saleRow.getSaleStatus())
-                .cartSummary(summary)
+                // 합계는 저장값 사용 (반품 거래는 라인이 REFUNDED 라 NORMAL 기준으로 다시 합산하면 0이 됨)
+                .cartSummary(CartSummary.restoredOf(summary, saleRow.getTotalQty(), saleRow.getTotalAmount()))
                 .payment(payment)
-                .refundDetail(null)
+                .refundDetail(getRefundDetail(saleRow))
                 .build();
+    }
+
+    // 반품 거래면 원거래 ID만 복원 (나머지 반품 정보는 SALES 에 저장하지 않음)
+    private static RefundDetail getRefundDetail(SaleRow saleRow) {
+        return saleRow.getOrigSaleId() != null
+                ? RefundDetail.restoredOf(saleRow.getOrigSaleId())
+                : null;
     }
 
     public static Cart getCartTransaction(CartKey cartKey, List<SaleLineRow> lineRows) {
@@ -52,9 +61,11 @@ public final class SaleRowMapper {
 
         switch (paymentRow.getMethod()) {
             case CASH:
-                return CashPayment.of(
+                return CashPayment.restoredOf(
                         getCommonPaymentData(cartKey, paymentRow),
-                        cashRow.getAmountReceived()
+                        cashRow.getAmountReceived(),
+                        cashRow.getChange(),
+                        paymentRow.getStatus()
                 );
 
             case CARD:

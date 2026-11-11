@@ -28,6 +28,18 @@ public class CartSummary {
         return create(cartKey.getStrCd(), cartKey.getPosNo(), cartKey.getTranNo(), cart, true);
     }
 
+    // DB 조회 결과로 복원: 키·라인은 그대로, 합계는 저장된 값
+    public static CartSummary restoredOf(CartSummary summary, int totalQty, BigDecimal totalAmount) {
+        return CartSummary.builder()
+                .strCd(summary.getStrCd())
+                .posNo(summary.getPosNo())
+                .tranNo(summary.getTranNo())
+                .totalQty(totalQty)
+                .totalAmount(totalAmount)
+                .lines(summary.getLines())
+                .build();
+    }
+
     private static CartSummary create(
             String strCd, String posNo, String tranNo, Cart cart, boolean isRefunded
     ) {

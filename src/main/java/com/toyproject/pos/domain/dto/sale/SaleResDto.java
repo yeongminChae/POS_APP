@@ -35,9 +35,16 @@ public class SaleResDto {
                 .approvedAt(sale.getPayment().approvedAt())
                 .cart(CartSummaryResDto.of(sale.getCartSummary()))
                 .payment(PaymentResDto.of(sale.getPayment()))
+                .origSaleId(getOrigSaleId(sale))
                 .build()
                 ;
 
+    }
+
+    private static Long getOrigSaleId(Sale sale) {
+        return sale.getRefundDetail() != null
+                ? sale.getRefundDetail().getOrigSaleId()
+                : null;
     }
 
     public SaleResDto withOriginSaleId(Long saleId) {
