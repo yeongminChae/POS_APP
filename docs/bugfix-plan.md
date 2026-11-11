@@ -9,13 +9,13 @@
 
 | 등급 | 의미 | 항목 |
 |---|---|---|
-| **P0** | 거래 흐름(담기 → 현금 결제 → 조회 → 반품)과 재고 차감에 직접 영향 | B7, B6, B2(+N1), B8, B3, B5, B4, B9, B1(+T3), B12a(재고 차감) |
+| **P0** | 거래 흐름(담기 → 현금 결제 → 조회 → 반품)과 재고 차감에 직접 영향 | B7, B6, B2(+N1), B8, B3, B5, B4, B9, B1(+T3), N5(장바구니 동시성), B12a(재고 차감) |
 | **P1** | 데이터 정합성 (흐름은 돌지만 저장된 값이 틀림) | B16, B12b(판매중지 차단), B10 |
 | **P2** | 나중에 해도 됨 (작고 독립적) | B14a(반품 사유), B15(타임존) |
 | **보류** | 지금 고치지 않음 (이유는 1장에) | B11, B13, B12c(성인 인증), B12d(재고 부족 차단), B14b(계산원), B17 |
 
 B12와 B14는 성격이 다른 문제가 섞여 있어 나눴다 (B12a~d, B14a~b).
-**목록 밖에서 새로 찾은 문제** N1~N4는 1.4절에 있다. N1은 B2와 같은 배치에서 처리하자고 제안한다.
+**목록 밖에서 새로 찾은 문제** N1~N4는 1.4절, N5(Q6 결정으로 생긴 동시성 문제)는 5.1절에 있다. N1은 B2와 같은 배치에서 처리한다.
 
 ---
 
@@ -452,6 +452,8 @@ flowchart LR
 |---|---|---|---|---|
 | **0. 사전 실험** | E1 → E2 → E3 → E4 | 실험 4개, 결과를 8장에 기록 | `docs` 커밋 1개 (+필요시 `chore` 설정 커밋) | — |
 | **1. 저장 기반** | 1 | B7 결제 ID 연결 | fix | 중 |
+| | 1-1 | POS 2대 동시 결제·반품 테스트 (5.1절) | test | 하 |
+| | 1-2 | (E2에서 BUSY 재현 시) IMMEDIATE + busy_timeout 설정 | chore | 중 |
 | | 2 | B6 반품 트랜잭션 (`refund_isAtomic` 활성화) | fix | 하 |
 | | 3 | B16 TR_JSON saleId | fix | 하 |
 | **2. 금액** | 4 | B2 반품 금액 | fix | 중 |
@@ -462,7 +464,8 @@ flowchart LR
 | | 9 | B4 중복 반품 거절 | fix | 중 |
 | | 10 | B9 없는 거래·카드 결제 예외 | fix | 하 |
 | | 11 | B1 카트 키 (+T3 시그니처) | fix | 중 |
-| | 11-1 | (선택) afterCommit 콜백 정리 | refactor | 하 |
+| | 11-1 | N5 장바구니 저장소 동시성 (5.1절) | fix | 하 |
+| | 11-2 | (선택) afterCommit 콜백 정리 | refactor | 하 |
 | **4. 재고·정합성** | 12 | B12a 재고 차감·복원 | fix | 상 |
 | | 13 | B12b 판매중지 거절 | fix | 중 |
 | | 14 | B10 예외 전파 | fix | 하 |
@@ -486,16 +489,36 @@ flowchart LR
 
 ---
 
-## 5. 진행 전에 결정할 것
+## 5. 결정 사항
 
-| # | 질문 | 권장 | 영향 항목 |
+| # | 질문 | 결정 | 영향 항목 |
 |---|---|---|---|
-| Q1 | 반품 결제 청구액(`PAYMENTS.AMOUNT_DUE_TO_PAY`)의 부호 | 음수 (SALES·SALE_LINES와 일치) | B2 |
-| Q2 | 반품 사유가 없을 때 | null | B14a |
-| Q3 | 판매중지 상품 거절 응답 | 지금은 기존 404 바디, 메시지 분리는 A4 | B12b |
-| Q4 | 재고 부족 시 판매 차단 | 차단하지 않음 (음수 재고 허용, B12d 보류) | B12a |
-| Q5 | 반품 거래 조회 응답에 `origSaleId` 채우기 (N3) | 채움 (B8에 포함) | B8 |
-| Q6 | 운영이 단일 POS인지, 여러 POS가 같은 DB 파일에 동시에 쓰는지 | — (E2 결과 해석에 필요) | B6, T2 |
+| Q1 | 반품 결제 청구액(`PAYMENTS.AMOUNT_DUE_TO_PAY`)의 부호 | **음수** (SALES·SALE_LINES와 일치) | B2 |
+| Q2 | 반품 사유가 없을 때 | **null** | B14a |
+| Q3 | 판매중지 상품 거절 응답 | **지금은 기존 404 바디**, 메시지 분리는 A4 | B12b |
+| Q4 | 재고 부족 시 판매 차단 | **차단하지 않음** (음수 재고 허용, B12d 보류) | B12a |
+| Q5 | 반품 거래 조회 응답에 `origSaleId` 채우기 (N3) | **채움** (B8에 포함) | B8 |
+| Q6 | 운영이 단일 POS인지, 여러 POS가 같은 DB 파일에 동시에 쓰는지 | **여러 POS가 동시에 씀** — 점포 1개에 POS 여러 대가 동시에 거래하는 시나리오를 시연 | B6, T2, N5 |
+
+### 5.1 Q6 결정에 따른 계획 변경
+
+- **E2에서 `SQLITE_BUSY`가 재현되면** B6 바로 앞에 설정 커밋을 넣는다: `chore(db): SQLite 트랜잭션 모드 IMMEDIATE 및 busy_timeout 설정`
+  - `application.yml`의 기본 URL(`${POS_DB_URL:...}`)과 `application-test.yml`에 `transaction_mode=IMMEDIATE`, `busy_timeout=<E2에서 정한 값>`을 붙인다
+  - `POS_DB_URL`로 넘기는 운영 URL에도 같은 파라미터가 필요하다 → CLAUDE.md "명령어" 절의 실행 예시도 같은 커밋에서 고친다
+  - IMMEDIATE는 쓰기 트랜잭션마다 시작 시점에 쓰기 잠금을 잡는다. 그래서 조회를 트랜잭션으로 묶으면(T2) 조회도 쓰기 잠금을 잡게 된다 → **이 경우 T2는 보류**한다 (3장 E1 표의 "공통" 행)
+- **동시 거래 시나리오 테스트 추가** (신규 `integration/ConcurrentPosIntegrationTest`)
+  - 테스트 프로필은 Hikari 풀 크기가 1이라 요청이 모두 직렬화된다. 그래서 이 클래스만 `@TestPropertySource(properties = "spring.datasource.hikari.maximum-pool-size=4")`로 풀을 늘린다 (별도 Spring 컨텍스트가 뜨면서 시드가 한 번 더 실행되지만, 시드는 맨 앞에서 전체 DELETE 하므로 안전)
+  - `CountDownLatch`로 두 스레드를 동시에 출발시킨다. 각 스레드는 MockMvc로 요청한다 (MockMvc는 스레드에 안전함)
+  - 시나리오: 미리 결제해 둔 원거래 A가 있는 상태에서 **POS 01은 새 거래를 결제하고, POS 02는 원거래 A를 반품**하는 것을 동시에 실행. 10회 반복
+  - 단언: 두 요청 모두 성공 (`SQLITE_BUSY`·`database is locked` 없음), SALES·PAYMENTS·CASH_PAYMENTS 건수가 정확함, 결제 ID가 맞음(B7)
+  - 단계적으로 단언을 늘림: B4 커밋에서 "**두 POS가 같은 원거래를 동시에 반품하면 정확히 1건만 성공**", B12a 커밋에서 "동시 결제·반품 후 재고가 정확함"
+  - 순서: B7 다음에 `test:` 커밋으로 추가 (지금 코드에서도 초록이어야 함 — 반품이 트랜잭션이 아니라 읽기→쓰기 잠금 승격이 없기 때문). 그다음 설정 커밋 → B6. B6 이후에도 초록이면 설정이 효과가 있는 것
+  - 커밋: `test: POS 2대 동시 결제·반품 시나리오 테스트 추가`
+- **N5 신규**: 인메모리 장바구니 저장소가 `LinkedHashMap`이라 여러 POS의 요청이 동시에 들어오면 스레드에 안전하지 않다 (`repository/implement/CartRepositoryImpl.java:18`, `compute`·`computeIfAbsent`·`remove`가 동시에 실행됨). 맵이 깨지거나 카트가 사라질 수 있다
+  - 수정: `ConcurrentHashMap`으로 변경. 삽입 순서 유지(LinkedHashMap을 쓴 이유)는 실제로 쓰는 곳이 없음 — 진행 시 다시 확인
+  - B1(카트 키 변경)과 같은 파일이라 **B1 바로 다음** 별도 `fix` 커밋: `fix(cart): 장바구니 저장소를 동시 접근에 안전한 맵으로 변경`
+  - 실패 테스트: 동시성 테스트에 "POS 여러 대가 서로 다른 거래에 동시에 담기 100회 → 모든 카트의 라인 수가 정확함" 추가. 경쟁 상태는 매번 재현되지 않을 수 있으므로, 수정 전 빨간 상태가 확인되지 않으면 그 사실을 기록하고 진행 (멈춤 조건에서 제외)
+  - 위험도: 하
 
 ## 6. 이번 계획에서 다루지 않는 것
 
@@ -513,3 +536,26 @@ flowchart LR
 ## 8. 실험 기록
 
 (E1~E4 결과를 여기에 기록)
+
+## 9. 메모: SQLite 동시성 한계와 PostgreSQL 전환 시 바뀌는 점
+
+계획에 포함하지 않는 참고 메모다. 시연(점포 1개, POS 여러 대)은 SQLite로 진행한다.
+
+**SQLite의 한계 (여러 POS가 같은 파일에 쓸 때)**
+- 쓰기는 **DB 파일 전체에 하나씩만** 가능하다. POS가 늘수록 결제·반품이 쓰기 잠금을 기다리는 시간이 길어지고, `busy_timeout`을 넘으면 `SQLITE_BUSY`로 실패한다
+- 기본 `BEGIN DEFERRED`에서는 읽기 → 쓰기로 잠금을 올리다가 다른 쓰기와 부딪히면 기다리지 않고 바로 실패할 수 있다. IMMEDIATE로 피할 수 있지만, 그만큼 트랜잭션이 직렬화된다
+- 롤백 저널(DELETE) 모드에서는 읽기와 쓰기 커밋이 서로를 막는다. WAL 모드면 읽기는 막히지 않지만, WAL은 **네트워크 파일 시스템에서 쓸 수 없다** (POS마다 다른 PC에서 공유 폴더의 DB 파일을 여는 구조라면 WAL 불가)
+- 여러 서버 프로세스가 각자 같은 파일을 열면, 인메모리 장바구니(N5)도 프로세스마다 따로 생긴다. 시연은 **서버 1대 + POS 여러 대**가 전제다
+- 행 단위 잠금이 없어서, B4의 조건부 UPDATE가 안전한 이유도 "애초에 쓰기가 하나씩만 일어나기 때문"이다
+
+**PostgreSQL로 바꾸면 달라지는 것**
+- 쓰기 동시성: 행 단위 잠금이라 서로 다른 거래는 동시에 저장된다. `transaction_mode`·`busy_timeout` 설정은 없어지고, 대신 잠금 대기 시간(`lock_timeout`)과 교착 감지가 생긴다
+- 격리 수준: 기본 `READ COMMITTED`. T2(조회 3쿼리 일관성)를 보장하려면 `REPEATABLE READ` 또는 쿼리를 하나로 합치기가 필요하다. `@Transactional(readOnly = true)`는 실제로 동작한다 (E1 같은 문제 없음)
+- B4: 조건부 UPDATE는 그대로 안전하다 (영향 행 수로 판정). 대안으로 `SELECT ... FOR UPDATE`나 부분 UNIQUE 인덱스(`WHERE ORIG_SALE_ID IS NOT NULL`)도 쓸 수 있다
+- B12a 재고: `STOCK = STOCK - ?`는 원자적이라 그대로 쓸 수 있다. 재고 부족 차단(B12d)을 하게 되면 `WHERE STOCK >= ?` 조건부 UPDATE로 구현
+- 생성키: `AUTOINCREMENT` → `GENERATED ALWAYS AS IDENTITY`. MyBatis `useGeneratedKeys`는 그대로 동작한다. B7처럼 `CASH_PAYMENTS.PAYMENT_ID`를 자식 테이블에서 AUTOINCREMENT로 두는 실수는 스키마 설계에서 바로 고칠 것 (PK = FK, 시퀀스 없음)
+- 타입: 금액 `REAL`/`NUMERIC` → `NUMERIC(12,0)` 또는 `BIGINT`, 시각 TEXT → `TIMESTAMPTZ` (B15 타임존 문제를 DB 수준에서 정리할 수 있음), CHECK → enum 타입 또는 CHECK 유지 (B17)
+- FK는 항상 강제된다 → 운영 데이터의 FK 위반(schema-issues 1번, `CATEGORY_ID = '42'` 710건)을 이관 전에 정리해야 한다
+- MyBatis XML: `ORDER BY ... LIMIT 1`, 서브쿼리 등은 대부분 그대로 쓸 수 있다. SQLite 전용 `PRAGMA`·트리거 기반 테스트(B6의 실패 주입)는 PostgreSQL 문법(`CREATE FUNCTION` + `CREATE TRIGGER`)으로 다시 작성해야 한다
+- 테스트: 파일 하나로 띄우던 테스트 DB를 Testcontainers 등으로 바꿔야 한다 (`build/test-db` 삭제 방식은 사라짐)
+- 인메모리 장바구니(N5)는 DB와 무관하다. 서버를 여러 대로 늘리려면 장바구니를 DB나 Redis로 옮겨야 한다 (CLAUDE.md의 "추후 DB 이전 예정")
