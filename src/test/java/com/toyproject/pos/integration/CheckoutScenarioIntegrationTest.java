@@ -1,7 +1,6 @@
 package com.toyproject.pos.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -181,9 +180,24 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @Disabled("재현 불가: refundTransaction 에 @Transactional 이 없어 SALES 저장 후 PAYMENTS/CASH_PAYMENTS 단계에서 실패하면 "
-            + "반품 거래가 부분 저장될 수 있다. 프로덕션 코드 수정 없이 중간 실패를 주입할 방법이 없어 보류")
-    void refund_isNotAtomic() {
+    @DisplayName("반품 저장 중 한 단계라도 실패하면 반품 전체가 롤백된다 (트리거로 CASH_PAYMENTS 단계 실패 주입)")
+    void refund_isAtomic() throws Exception {
+        String tranNo = paidSale(CHIPS);
+        String refundTranNo = newTranNo();
+
+        // 반품만 받은 금액이 음수이므로, 반품의 현금 상세 INSERT 만 실패한다
+        jdbc.execute("CREATE TRIGGER fail_refund_cash BEFORE INSERT ON CASH_PAYMENTS "
+                + "WHEN NEW.AMOUNT_RECEIVED < 0 BEGIN SELECT RAISE(ABORT, 'injected failure'); END");
+        try {
+            assertThatThrownBy(() -> refund(POS_1, refundTranNo, POS_1, tranNo))
+                    .rootCause().hasMessageContaining("injected failure");
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS fail_refund_cash");
+        }
+
+        assertThat(countSales(POS_1, refundTranNo)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM SALES WHERE ORIG_SALE_ID = ?", Integer.class,
+                saleId(POS_1, tranNo))).isZero();
     }
 
     /** 단일 상품을 현금 결제까지 끝낸 거래번호를 반환 */

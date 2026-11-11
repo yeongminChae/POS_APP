@@ -65,6 +65,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     }
 
     @Override
+    @Transactional
     public SaleResDto refundTransaction(RefundReqDto refundReqDto) {
         // 기존 거래 정보 호출
         StoredTransaction origin = loadTransaction(refundReqDto.getRefundInfoKey());
