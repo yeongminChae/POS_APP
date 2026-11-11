@@ -1,0 +1,22 @@
+package com.toyproject.pos.controller;
+
+import com.toyproject.pos.service.interfaces.ProductService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/product")
+@Validated
+@RequiredArgsConstructor
+public class ProductController {
+
+    private final ProductService productService;
+
+//    @GetMapping("/{barcode}")
+//    public Map<String, ProductQueryDto> getProductByBarcode(@PathVariable String barcode) {
+//        return productService.findProduct(barcode);
+//    }
+
+}

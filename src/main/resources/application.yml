@@ -1,0 +1,36 @@
+spring:
+  cloud:
+    consul:
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+  application:
+    name: pos_project
+
+  datasource:
+    url: ${POS_DB_URL:jdbc:sqlite:./data/pos.db}
+    driver-class-name: org.sqlite.JDBC
+
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.toyproject.pos.domain, com.toyproject.pos.persistence.row
+  configuration:
+    map-underscore-to-camel-case: true
+    default-fetch-size: 100
+    default-statement-timeout: 30
+
+management:
+  health:
+    consul:
+      enabled: false
+#  endpoints:
+#    web:
+#      exposure:
+#        include: "health,info,metrics"
+
+

@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.toyproject.pos.persistence.mapper.CheckoutMapper">
+
+    <!-- ===== constructor-based resultMaps (불변 객체 매핑) ===== -->
+    <!-- SALES -->
+    <resultMap id="SaleRowMap" type="com.toyproject.pos.persistence.row.SaleRow">
+        <constructor>
+            <idArg column="SALE_ID" javaType="long"/>
+            <idArg column="RECEIPT_NO" javaType="string"/>
+            <arg column="STORE_CD" javaType="string"/>
+            <arg column="POS_NO" javaType="string"/>
+            <arg column="TRAN_NO" javaType="string"/>
+            <arg column="CASHIER" javaType="string"/>                 <!-- nullable OK -->
+            <arg column="SALE_STATUS"
+                 javaType="com.toyproject.pos.domain.model.sale.SaleStatus"/>                 <!-- 'NORMAL' | 'REFUNDED' -->
+            <arg column="APPROVED_AT" javaType="string"/>                 <!-- ISO8601 String -->
+            <arg column="TOTAL_QTY" javaType="int"/>
+            <arg column="TOTAL_AMOUNT" javaType="java.math.BigDecimal"/>
+            <arg column="ORIG_SALE_ID" javaType="java.lang.Long"/>         <!-- NULL 허용 -->
+        </constructor>
+    </resultMap>
+
+    <!-- SALE_LINES -->
+    <resultMap id="SaleLineRowMap" type="com.toyproject.pos.persistence.row.SaleLineRow">
+        <constructor>
+            <idArg column="SALE_LINE_ID" javaType="long"/>
+            <arg column="SALE_ID" javaType="long"/>
+            <arg column="LINE_NO" javaType="string"/>
+            <arg column="BARCODE" javaType="string"/>
+            <arg column="NAME" javaType="string"/>
+            <arg column="UNIT_PRICE" javaType="java.math.BigDecimal"/>
+            <arg column="QTY" javaType="int"/>
+            <arg column="AMOUNT" javaType="java.math.BigDecimal"/>
+            <arg column="ITEM_STATUS"
+                 javaType="com.toyproject.pos.domain.model.cart.ItemStatus"/>              <!-- 'NORMAL' | 'CANCELLED' -->
+        </constructor>
+    </resultMap>
+
+    <!-- PAYMENTS -->
+    <resultMap id="PaymentRowMap" type="com.toyproject.pos.persistence.row.PaymentRow">
+        <constructor>
+            <idArg column="PAYMENT_ID" javaType="long"/>
+            <arg column="SALE_ID" javaType="long"/>
+            <arg column="METHOD"
+                 javaType="com.toyproject.pos.domain.model.payment.PaymentEnums$PaymentMethod"/>             <!-- 'CASH' | 'CARD' | ... -->
+            <arg column="STATUS"
+                 javaType="com.toyproject.pos.domain.model.payment.PaymentEnums$PaymentStatus"/>             <!-- 'APPROVED' | ... -->
+            <arg column="AMOUNT_DUE_TO_PAY" javaType="java.math.BigDecimal"/>
+            <arg column="APPROVED_AT" javaType="string"/>
+        </constructor>
+    </resultMap>
+
+    <!-- CASH_PAYMENTS -->
+    <resultMap id="CashPaymentRowMap" type="com.toyproject.pos.persistence.row.CashPaymentRow">
+        <constructor>
+            <idArg column="PAYMENT_ID" javaType="long"/>
+            <arg column="AMOUNT_RECEIVED" javaType="java.math.BigDecimal"/>
+            <arg column="CHANGE" javaType="java.math.BigDecimal"/>
+        </constructor>
+    </resultMap>
+
+
+    <!-- ======================== INSERTS ======================== -->
+    <insert id="insertSale"
+            parameterType="com.toyproject.pos.persistence.row.SaleRow"
+            useGeneratedKeys="true" keyProperty="saleId" keyColumn="SALE_ID">
+        INSERT INTO SALES ( RECEIPT_NO
+                          , STORE_CD
+                          , POS_NO
+                          , TRAN_NO
+                          , CASHIER
+                          , SALE_STATUS
+                          , APPROVED_AT
+                          , TOTAL_QTY
+                          , TOTAL_AMOUNT
+                          , ORIG_SALE_ID)
+        VALUES ( #{receiptNo}
+               , #{storeCd}
+               , #{posNo}
+               , #{tranNo}
+               , #{cashier}
+               , #{saleStatus}
+               , #{approvedAt}
+               , #{totalQty}
+               , #{totalAmount}
+               , #{origSaleId})
+    </insert>
+
+    <!-- SALE_LINES 배치 INSERT -->
+    <insert id="insertSaleLines">
+        INSERT INTO SALE_LINES (
+        SALE_ID
+        , LINE_NO
+        , BARCODE
+        , NAME
+        , UNIT_PRICE
+        , QTY
+        , AMOUNT
+        , ITEM_STATUS
+        )
+        VALUES
+        <foreach collection="lines" item="it" separator=",">
+            (
+            #{it.saleId}
+            , #{it.lineNo}
+            , #{it.barcode}
+            , #{it.name}
+            , #{it.unitPrice}
+            , #{it.qty}
+            , #{it.amount}
+            , #{it.itemStatus}
+            )
+        </foreach>
+    </insert>
+
+    <!-- PAYMENTS INSERT -->
+    <insert id="insertPayment"
+            parameterType="com.toyproject.pos.persistence.row.PaymentRow">
+        INSERT INTO PAYMENTS ( PAYMENT_ID
+                             , SALE_ID
+                             , METHOD
+                             , STATUS
+                             , AMOUNT_DUE_TO_PAY
+                             , APPROVED_AT)
+        VALUES (#{paymentId}, #{saleId}, #{method}, #{status}, #{amountDueToPay}, #{approvedAt})
+    </insert>
+
+    <!-- CASH_PAYMENTS INSERT -->
+    <insert id="insertCashPayment"
+            parameterType="com.toyproject.pos.persistence.row.CashPaymentRow">
+        INSERT INTO CASH_PAYMENTS ( PAYMENT_ID
+                                  , AMOUNT_RECEIVED
+                                  , CHANGE)
+        VALUES (#{paymentId}, #{amountReceived}, #{change})
+    </insert>
+
+    <!-- RECEIPT_JOURNAL INSERT -->
+    <insert id="insertJournalData"
+            parameterType="com.toyproject.pos.persistence.row.JournalDataRow">
+        INSERT INTO RECEIPT_JOURNAL ( RECEIPT_NO
+                                    , SALE_ID
+                                    , STORE_CD
+                                    , POS_NO
+                                    , TRAN_NO
+                                    , APPROVED_AT
+                                    , TR_JSON
+                                    , BODY_TEXT)
+        VALUES (#{receiptNo},
+                #{saleId},
+                #{storeCd},
+                #{posNo},
+                #{tranNo},
+                #{approvedAt},
+                #{trJson},
+                #{bodyText})
+    </insert>
+
+    <!-- ======================== SELECTS ======================== -->
+
+    <select id="selectSaleByTranInfo" resultMap="SaleRowMap">
+        SELECT SALE_ID,
+               RECEIPT_NO,
+               STORE_CD,
+               POS_NO,
+               TRAN_NO,
+               CASHIER,
+               SALE_STATUS,
+               APPROVED_AT,
+               TOTAL_QTY,
+               TOTAL_AMOUNT,
+               ORIG_SALE_ID
+        FROM SALES
+        WHERE STORE_CD = #{storeCd}
+          AND POS_NO = #{posNo}
+          AND TRAN_NO = #{tranNo}
+    </select>
+
+<!--    <select id="selectSaleLinesBySaleId" resultMap="SaleLineRowMap">-->
+<!--        SELECT SALE_LINE_ID,-->
+<!--               SALE_ID,-->
+<!--               LINE_NO,-->
+<!--               BARCODE,-->
+<!--               NAME,-->
+<!--               UNIT_PRICE,-->
+<!--               QTY,-->
+<!--               AMOUNT,-->
+<!--               ITEM_STATUS-->
+<!--        FROM SALE_LINES-->
+<!--        WHERE SALE_ID = #{saleId}-->
+<!--        ORDER BY LINE_NO ASC-->
+<!--    </select>-->
+
+<!--    <select id="selectPaymentBySaleId" resultMap="PaymentRowMap">-->
+<!--        SELECT PAYMENT_ID,-->
+<!--               SALE_ID,-->
+<!--               METHOD,-->
+<!--               STATUS,-->
+<!--               AMOUNT_DUE_TO_PAY,-->
+<!--               APPROVED_AT-->
+<!--        FROM PAYMENTS-->
+<!--        WHERE SALE_ID = #{saleId}-->
+<!--        ORDER BY APPROVED_AT DESC-->
+<!--        LIMIT 1-->
+<!--    </select>-->
+
+    <select id="selectSaleLinesBySaleKey" resultMap="SaleLineRowMap">
+        SELECT SALE_LINE_ID,
+               SALE_ID,
+               LINE_NO,
+               BARCODE,
+               NAME,
+               UNIT_PRICE,
+               QTY,
+               AMOUNT,
+               ITEM_STATUS
+        FROM SALE_LINES
+        WHERE SALE_ID = (SELECT SALE_ID
+                         FROM SALES
+                         WHERE STORE_CD = #{storeCd}
+                           AND POS_NO = #{posNo}
+                           AND TRAN_NO = #{tranNo})
+        ORDER BY LINE_NO ASC
+    </select>
+
+    <select id="selectPaymentBySaleKey" resultMap="PaymentRowMap">
+        SELECT PAYMENT_ID,
+               SALE_ID,
+               METHOD,
+               STATUS,
+               AMOUNT_DUE_TO_PAY,
+               APPROVED_AT
+        FROM PAYMENTS
+        WHERE SALE_ID = (SELECT SALE_ID
+                         FROM SALES
+                         WHERE STORE_CD = #{storeCd}
+                           AND POS_NO = #{posNo}
+                           AND TRAN_NO = #{tranNo})
+        ORDER BY APPROVED_AT DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectCashPaymentById" resultMap="CashPaymentRowMap">
+        SELECT PAYMENT_ID, AMOUNT_RECEIVED, CHANGE
+        FROM CASH_PAYMENTS
+        WHERE 1 = 1
+          and PAYMENT_ID = #{paymentId}
+    </select>
+
+</mapper>

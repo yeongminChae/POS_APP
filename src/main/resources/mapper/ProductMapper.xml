@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.toyproject.pos.persistence.mapper.ProductMapper">
+
+    <!-- 상품 조회 쿼리 : 단건 조회  -->
+    <select id="findByBarcode" resultType="com.toyproject.pos.domain.dto.product.ProductQueryDto">
+        select p.PRODUCT_ID
+             , p.BARCODE
+             , p.NAME
+             , p.PRICE
+             , p.BRAND_ID
+             , p.CATEGORY_ID
+        --        , p.EXPIRY_DATEF
+        --        , p.IS_ADULT_ONLY
+        from PRODUCT p
+        where 1 = 1
+          and p.BARCODE = #{barcode}
+        ;
+    </select>
+
+    <!-- 상품 재고 반영 쿼리 -->
+    <update id="updateProductStock">
+        UPDATE inventory
+        SET stock = stock - #{qty}
+        WHERE 1 = 1
+          and PRODUCT_ID = #{productId}
+    </update>
+
+</mapper>
