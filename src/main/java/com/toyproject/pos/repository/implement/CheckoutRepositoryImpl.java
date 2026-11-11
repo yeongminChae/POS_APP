@@ -62,10 +62,9 @@ public class CheckoutRepositoryImpl implements CheckoutRepository {
     }
 
     @Override
-    public Sale getTransaction(CartKey cartKey, Cart cart, Payment payment) {
+    public Sale getTransaction(CartKey cartKey, CartSummary cartSummary, Payment payment) {
 
         SaleRow saleRow = getSaleRow(cartKey);
-        CartSummary cartSummary = CartSummary.of(cart);
 
         return SaleRowMapper.toSale(saleRow, cartSummary, payment);
     }

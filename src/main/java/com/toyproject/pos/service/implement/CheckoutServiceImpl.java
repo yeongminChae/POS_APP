@@ -93,7 +93,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     private StoredTransaction loadTransaction(CartKey cartKey) {
         Cart cart = checkoutRepository.getCart(cartKey);
         Payment payment = checkoutRepository.getPayment(cartKey);
-        Sale sale = checkoutRepository.getTransaction(cartKey, cart, payment);
+        Sale sale = checkoutRepository.getTransaction(cartKey, CartSummary.of(cart), payment);
 
         return new StoredTransaction(cart, sale);
     }
