@@ -66,16 +66,12 @@ public final class SaleRowMapper {
     }
 
     private static CommonPaymentData getCommonPaymentData(CartKey cartKey, PaymentRow paymentRow) {
-        return CommonPaymentData.builder()
-                .paymentId(null)
-                .strCd(cartKey.getStrCd())
-                .posNo(cartKey.getPosNo())
-                .tranNo(cartKey.getTranNo())
-                .amountDueToPay(paymentRow.getAmountDueToPay())
-                .method(paymentRow.getMethod())
-                .requestedAt(paymentRow.getApprovedAt())
-                .approvedAt(paymentRow.getApprovedAt())
-                .build();
+        return CommonPaymentData.restoredOf(
+                cartKey,
+                paymentRow.getAmountDueToPay(),
+                paymentRow.getMethod(),
+                paymentRow.getApprovedAt()
+        );
     }
 
     private static Map<String, CartLine> getLineMap(List<SaleLineRow> lineRows) {
