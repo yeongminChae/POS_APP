@@ -104,33 +104,27 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] CASH_PAYMENTS.PAYMENT_ID 는 PAYMENTS 와 별도 AUTOINCREMENT — 시퀀스가 어긋나면 다른 결제에 붙고 조회가 NPE")
-    void cashPaymentId_isIndependentSequence() throws Exception {
+    @DisplayName("CASH_PAYMENTS.PAYMENT_ID 는 같은 결제의 PAYMENTS.PAYMENT_ID — 현금 상세가 없는 결제가 끼어도 어긋나지 않는다")
+    void cashPaymentId_matchesPaymentId() throws Exception {
         String first = newTranNo();
         addItem(POS_1, first, CHIPS);
         checkoutCash(POS_1, first, 2000);
 
-        // 현금 상세가 없는 결제 1건이 생긴 상황을 재현 (예: 향후 카드 결제)
+        // 현금 상세가 없는 결제 1건이 생긴 상황 (예: 향후 카드 결제)
         jdbc.update("INSERT INTO PAYMENTS (SALE_ID, METHOD, STATUS, AMOUNT_DUE_TO_PAY, APPROVED_AT) "
                 + "VALUES (?, 'CARD', 'APPROVED', 0, '2025-01-01 00:00:00')", saleId(POS_1, first));
-        long orphanPaymentId = jdbc.queryForObject("SELECT MAX(PAYMENT_ID) FROM PAYMENTS", Long.class);
 
         String second = newTranNo();
         addItem(POS_1, second, CHIPS);
-        try {
-            checkoutCash(POS_1, second, 2000);
+        checkoutCash(POS_1, second, 2000);
 
-            long paymentId = jdbc.queryForObject(
-                    "SELECT PAYMENT_ID FROM PAYMENTS WHERE SALE_ID = ?", Long.class, saleId(POS_1, second));
-            long cashPaymentId = jdbc.queryForObject("SELECT MAX(PAYMENT_ID) FROM CASH_PAYMENTS", Long.class);
+        long paymentId = jdbc.queryForObject(
+                "SELECT PAYMENT_ID FROM PAYMENTS WHERE SALE_ID = ?", Long.class, saleId(POS_1, second));
+        assertThat(amt(jdbc.queryForObject(
+                "SELECT AMOUNT_RECEIVED FROM CASH_PAYMENTS WHERE PAYMENT_ID = ?", Object.class, paymentId)))
+                .isEqualByComparingTo("2000");
 
-            assertThat(cashPaymentId).isEqualTo(orphanPaymentId).isNotEqualTo(paymentId); // 엉뚱한 결제에 연결됨
-            assertThatThrownBy(() -> callTransaction(POS_1, second))
-                    .hasRootCauseInstanceOf(NullPointerException.class);
-        } finally {
-            // 다른 테스트를 위해 두 시퀀스를 다시 맞춘다 (명시 ID 삽입 → sqlite_sequence 가 MAX 로 갱신)
-            Long maxPayment = jdbc.queryForObject("SELECT MAX(PAYMENT_ID) FROM PAYMENTS", Long.class);
-            jdbc.update("INSERT INTO CASH_PAYMENTS (PAYMENT_ID, AMOUNT_RECEIVED, CHANGE) VALUES (?, 0, 0)", maxPayment);
-        }
+        JsonNode called = json(callTransaction(POS_1, second));
+        assertThat(amt(called.at("/payment/cash/change"))).isEqualByComparingTo("500");
     }
 }

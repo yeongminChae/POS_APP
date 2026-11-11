@@ -39,12 +39,13 @@ public class CheckoutRepositoryImpl implements CheckoutRepository {
         // 3) PAYMENT
         Payment payment = sale.getPayment();
         if (payment != null) {
-            checkoutMapper.insertPayment(PaymentRow.of(payment, saleId));
+            PaymentRow paymentRow = PaymentRow.of(payment, saleId);
+            checkoutMapper.insertPayment(paymentRow); // generated PAYMENT_ID 채워짐
 
             switch (payment.method()) {
 
                 case CASH:
-                    checkoutMapper.insertCashPayment(CashPaymentRow.of(payment));
+                    checkoutMapper.insertCashPayment(CashPaymentRow.of(payment, paymentRow.getPaymentId()));
                     checkoutMapper.insertJournalData(getJournalDataRow(sale, saleId));
 
                     break;

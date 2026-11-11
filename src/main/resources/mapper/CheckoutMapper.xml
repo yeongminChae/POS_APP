@@ -116,7 +116,8 @@
 
     <!-- PAYMENTS INSERT -->
     <insert id="insertPayment"
-            parameterType="com.toyproject.pos.persistence.row.PaymentRow">
+            parameterType="com.toyproject.pos.persistence.row.PaymentRow"
+            useGeneratedKeys="true" keyProperty="paymentId" keyColumn="PAYMENT_ID">
         INSERT INTO PAYMENTS ( PAYMENT_ID
                              , SALE_ID
                              , METHOD

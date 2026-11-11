@@ -78,8 +78,7 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
         assertThat(payment.get("STATUS")).isEqualTo("APPROVED");
         assertThat(amt(payment.get("AMOUNT_DUE_TO_PAY"))).isEqualByComparingTo("10500");
 
-        // [현재 동작] CASH_PAYMENTS.PAYMENT_ID 는 PAYMENTS 와 별개로 AUTOINCREMENT 된 값이다.
-        // 두 시퀀스가 우연히 맞아서 조인이 된다 (어긋나는 경우는 CheckoutEdgeIntegrationTest 참고).
+        // CASH_PAYMENTS.PAYMENT_ID 는 같은 결제의 PAYMENTS.PAYMENT_ID
         Map<String, Object> cash = jdbc.queryForMap(
                 "SELECT * FROM CASH_PAYMENTS WHERE PAYMENT_ID = ?", payment.get("PAYMENT_ID"));
         assertThat(amt(cash.get("AMOUNT_RECEIVED"))).isEqualByComparingTo("20000");

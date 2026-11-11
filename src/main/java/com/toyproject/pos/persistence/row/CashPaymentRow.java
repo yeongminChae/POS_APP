@@ -16,10 +16,11 @@ public class CashPaymentRow {
     private final BigDecimal amountReceived;
     private final BigDecimal change;
 
-    public static CashPaymentRow of(Payment payment) {
+    // paymentId: 같은 결제의 PAYMENTS 생성키 (PK = FK)
+    public static CashPaymentRow of(Payment payment, Long paymentId) {
 
         return CashPaymentRow.builder()
-                .paymentId(null)
+                .paymentId(paymentId)
                 .amountReceived(payment.amountReceived())
                 .change(CashPayment.calculateChange(payment.amountReceived(), payment.amountDue()))
                 .build();

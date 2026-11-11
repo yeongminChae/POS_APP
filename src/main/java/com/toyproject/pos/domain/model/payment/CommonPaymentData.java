@@ -27,6 +27,7 @@ public class CommonPaymentData {
     // 결제 요청 시 신규 생성 (요청·승인 시각 = 현재)
     public static CommonPaymentData of(PaymentReqDto paymentReq, BigDecimal amountDueToPay) {
         return create(
+                null,
                 paymentReq.getKey(),
                 amountDueToPay,
                 paymentReq.getPaymentMethod(),
@@ -37,15 +38,17 @@ public class CommonPaymentData {
 
     // DB 조회 결과로 복원 (요청 시각은 저장하지 않으므로 승인 시각으로 채움)
     public static CommonPaymentData restoredOf(
+            Long paymentId,
             CartKey cartKey,
             BigDecimal amountDueToPay,
             PaymentEnums.PaymentMethod method,
             String approvedAt
     ) {
-        return create(cartKey, amountDueToPay, method, approvedAt, approvedAt);
+        return create(paymentId, cartKey, amountDueToPay, method, approvedAt, approvedAt);
     }
 
     private static CommonPaymentData create(
+            Long paymentId,
             CartKey cartKey,
             BigDecimal amountDueToPay,
             PaymentEnums.PaymentMethod method,
@@ -53,7 +56,7 @@ public class CommonPaymentData {
             String approvedAt
     ) {
         return CommonPaymentData.builder()
-                .paymentId(null)
+                .paymentId(paymentId)
                 .strCd(cartKey.getStrCd())
                 .posNo(cartKey.getPosNo())
                 .tranNo(cartKey.getTranNo())

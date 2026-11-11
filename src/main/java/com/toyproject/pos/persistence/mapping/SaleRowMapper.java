@@ -67,6 +67,7 @@ public final class SaleRowMapper {
 
     private static CommonPaymentData getCommonPaymentData(CartKey cartKey, PaymentRow paymentRow) {
         return CommonPaymentData.restoredOf(
+                paymentRow.getPaymentId(),
                 cartKey,
                 paymentRow.getAmountDueToPay(),
                 paymentRow.getMethod(),
