@@ -2,6 +2,7 @@ package com.toyproject.pos.domain.dto.product.request;
 
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
+import com.toyproject.pos.domain.model.cart.CartKey;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,5 +18,9 @@ public class ProductReqDto {
 
     @Builder.Default
     private final Integer qty = 1;
+
+    public CartKey getKey() {
+        return cartInfoReqDto.getKey();
+    }
 
 }

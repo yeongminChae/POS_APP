@@ -2,6 +2,7 @@ package com.toyproject.pos.domain.dto.payment.request;
 
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
+import com.toyproject.pos.domain.model.cart.CartKey;
 import com.toyproject.pos.domain.model.payment.PaymentEnums;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,5 +22,8 @@ public class PaymentReqDto {
 
     private CardReqDto cardReqDto; // method == CARD일 때만 채움
 
+    public CartKey getKey() {
+        return cartInfoReqDto.getKey();
+    }
 
 }

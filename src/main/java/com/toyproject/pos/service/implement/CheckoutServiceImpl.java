@@ -32,7 +32,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
     @Override
     public CartSummary getSaleSummary(PaymentReqDto paymentReq) {
-        Cart cart = cartService.getCurrentCart(paymentReq.getCartInfoReqDto());
+        Cart cart = cartService.getCurrentCart(paymentReq.getKey());
 
         return CartSummary.of(cart);
     }
@@ -137,7 +137,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     }
 
     private Cart getCurrentCart(PaymentReqDto paymentReq) {
-        return cartService.getCurrentCart(paymentReq.getCartInfoReqDto());
+        return cartService.getCurrentCart(paymentReq.getKey());
     }
 
     private static Payment getRefund(Payment originalPayment) {

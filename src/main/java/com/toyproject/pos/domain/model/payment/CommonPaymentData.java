@@ -1,6 +1,7 @@
 package com.toyproject.pos.domain.model.payment;
 
 import com.toyproject.pos.domain.dto.payment.request.PaymentReqDto;
+import com.toyproject.pos.domain.model.cart.CartKey;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,11 +26,13 @@ public class CommonPaymentData {
     private final String approvedAt;
 
     public static CommonPaymentData of(PaymentReqDto paymentReq, BigDecimal amountDueToPay) {
+        CartKey cartKey = paymentReq.getKey();
+
         return CommonPaymentData.builder()
                 .paymentId(null)
-                .strCd(paymentReq.getCartInfoReqDto().getStrCd())
-                .posNo(paymentReq.getCartInfoReqDto().getPosNo())
-                .tranNo(paymentReq.getCartInfoReqDto().getTranNo())
+                .strCd(cartKey.getStrCd())
+                .posNo(cartKey.getPosNo())
+                .tranNo(cartKey.getTranNo())
                 .amountDueToPay(amountDueToPay)
                 .method(paymentReq.getPaymentMethod())
                 .requestedAt(dateTimeFormat())

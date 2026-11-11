@@ -44,7 +44,7 @@ public class CartServiceImpl implements CartService {
 
             // 레포지토리에서 카트 모델에 추가 및 수량 증가
             // 현재는 임시 저장소에 저장
-            CartKey cartKey = productReqDto.getCartInfoReqDto().getKey();
+            CartKey cartKey = productReqDto.getKey();
             cartRepository.addOrIncrease(cartKey, cartLine);
 
             // 재고 수량 업데이트
@@ -66,7 +66,7 @@ public class CartServiceImpl implements CartService {
     public boolean updatedQty(ProductReqDto productReqDto) {
         Integer qty = productReqDto.getQty();
         String barcode = productReqDto.getBarcode();
-        CartKey cartKey = productReqDto.getCartInfoReqDto().getKey();
+        CartKey cartKey = productReqDto.getKey();
 
         if (qty <= 0 || cartRepository.isCanceledItem(cartKey, barcode)) return false;
 
@@ -76,7 +76,7 @@ public class CartServiceImpl implements CartService {
 
     @Override
     public boolean cancelLine(ProductReqDto productReqDto) {
-        CartKey cartKey = productReqDto.getCartInfoReqDto().getKey();
+        CartKey cartKey = productReqDto.getKey();
         String barcode = productReqDto.getBarcode();
 
         return cartRepository.updateStatusToCancel(cartKey, barcode);
