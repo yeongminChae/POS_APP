@@ -75,7 +75,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         refundedCart.refundAll();
 
         // 반품 거래로 상태 바뀐 모델 생성
-        CartKey newTranKey = refundReqDto.getCartInfoReqDto().getKey();
+        CartKey newTranKey = refundReqDto.getKey();
         CartSummary refundCartSummary = CartSummary.refundOf(refundedCart, newTranKey);
         Payment refundPayment = getRefund(sale.getPayment());
 

@@ -21,6 +21,10 @@ public class RefundReqDto {
 
     private final String reason;      // 환불 사유 (선택)
 
+    public CartKey getKey() {
+        return cartInfoReqDto.getKey();
+    }
+
     public CartKey getRefundInfoKey() {
         return CartKey.of(this.origStrCd, this.origPosNo, this.origTranNo);
     }
