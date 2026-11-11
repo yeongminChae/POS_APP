@@ -11,6 +11,14 @@ spring:
   datasource:
     url: ${POS_DB_URL:jdbc:sqlite:./data/pos.db}
     driver-class-name: org.sqlite.JDBC
+    hikari:
+      # SQLite 동시 쓰기 대응 (POS 여러 대가 같은 DB 파일에 씀, docs/bugfix-plan.md 8장 E2)
+      # - IMMEDIATE: 트랜잭션 시작 시 쓰기 잠금을 잡아 "읽기 → 쓰기" 승격 중 즉시 SQLITE_BUSY 가 나는 것을 막음
+      # - busy_timeout: 다른 POS 의 쓰기가 끝날 때까지 최대 5초 대기
+      # URL 이 아니라 드라이버 속성으로 넣어서 POS_DB_URL 로 URL 을 바꿔도 항상 적용된다
+      data-source-properties:
+        transaction_mode: IMMEDIATE
+        busy_timeout: 5000
 
   mvc:
     pathmatch:

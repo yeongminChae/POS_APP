@@ -25,6 +25,7 @@ POS_DB_URL="jdbc:sqlite:/절대/경로/PRODUCT_MST" ./gradlew bootRun
 ## DB
 
 - 운영 SQLite 파일은 레포 밖에 있다. `application.yml`의 `datasource.url`에 로컬 절대경로를 하드코딩하지 말 것 (`${POS_DB_URL:...}` 유지).
+- 여러 POS가 같은 DB 파일에 동시에 쓰는 것을 전제로 `transaction_mode=IMMEDIATE`, `busy_timeout=5000`을 `spring.datasource.hikari.data-source-properties`로 설정한다 (URL이 아니라 드라이버 속성이라 `POS_DB_URL`을 바꿔도 적용됨). 빼면 "읽기 → 쓰기" 트랜잭션(반품)이 동시 결제와 부딪혀 즉시 `SQLITE_BUSY`가 난다 — `docs/bugfix-plan.md` 8장 E2, `ConcurrentPosIntegrationTest`.
 - 스키마: `src/main/resources/db/schema.sql` (운영 DB에서 `sqlite3 <db> '.schema'`로 추출, `CREATE ... IF NOT EXISTS` 형태). 운영 스키마가 바뀌면 다시 추출해서 갱신한다.
   - 제외 테이블: `sqlite_sequence`(SQLite 내부), `raw_product_data`(이관용 원본, 코드에서 미사용).
 - 알려진 스키마 문제점: `docs/schema-issues.md` (enum ↔ CHECK 불일치는 런타임 오류 가능).
