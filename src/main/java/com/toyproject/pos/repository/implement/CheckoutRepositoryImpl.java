@@ -108,7 +108,8 @@ public class CheckoutRepositoryImpl implements CheckoutRepository {
     }
 
     private JournalDataRow getJournalDataRow(Sale sale, Long saleId) {
-        String trJson = convertTrData(sale); // ObjectMapper 사용
+        // 저장 후 생성된 SALE_ID 를 채운 Sale 을 직렬화 (ObjectMapper 사용)
+        String trJson = convertTrData(sale.toBuilder().saleId(saleId).build());
 
         return JournalDataRow.of(sale, saleId, trJson);
     }

@@ -88,7 +88,7 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
         assertThat(journal.get("TRAN_NO")).isEqualTo(tranNo);
         assertThat(journal.get("BODY_TEXT")).isNull();
         JsonNode trJson = objectMapper.readTree((String) journal.get("TR_JSON"));
-        assertThat(trJson.get("saleId").isNull()).isTrue(); // [현재 동작] 저장 전 Sale 을 직렬화해서 saleId 가 null
+        assertThat(trJson.get("saleId").asLong()).isEqualTo(saleId);
         assertThat(trJson.at("/cartSummary/lines")).hasSize(3);
 
         // 5-2) 커밋 후 인메모리 장바구니 비워짐 (같은 키로 조회하면 새 빈 카트)
@@ -136,6 +136,9 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM RECEIPT_JOURNAL WHERE SALE_ID = ?", Integer.class, refundSaleId))
                 .isEqualTo(1);
+        JsonNode refundTrJson = objectMapper.readTree(jdbc.queryForObject(
+                "SELECT TR_JSON FROM RECEIPT_JOURNAL WHERE SALE_ID = ?", String.class, refundSaleId));
+        assertThat(refundTrJson.get("saleId").asLong()).isEqualTo(refundSaleId);
 
         // [현재 동작/버그] 원거래 상태는 NORMAL 그대로 (반품 여부가 원거래에 표시되지 않음)
         assertThat(saleRow(POS_1, tranNo).get("SALE_STATUS")).isEqualTo("NORMAL");
