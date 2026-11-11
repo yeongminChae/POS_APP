@@ -41,15 +41,15 @@ public class CheckoutRepositoryImpl implements CheckoutRepository {
         if (payment != null) {
             checkoutMapper.insertPayment(PaymentRow.of(payment, saleId));
 
-            switch (payment.method().name()) {
+            switch (payment.method()) {
 
-                case "CASH":
+                case CASH:
                     checkoutMapper.insertCashPayment(CashPaymentRow.of(payment));
                     checkoutMapper.insertJournalData(getJournalDataRow(sale, saleId));
 
                     break;
 
-                case "CARD":
+                case CARD:
                     throw new UnsupportedOperationException("CARD 결제는 아직 미지원");
 
 //                    break;

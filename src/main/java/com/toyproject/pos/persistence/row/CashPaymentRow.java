@@ -1,6 +1,7 @@
 package com.toyproject.pos.persistence.row;
 
 import com.toyproject.pos.domain.model.payment.Payment;
+import com.toyproject.pos.domain.model.payment.PaymentEnums.PaymentMethod;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,7 +26,7 @@ public class CashPaymentRow {
     }
 
     private static BigDecimal getChangeCash(Payment payment) {
-        if (payment.method().name().equals("CASH") == false) return null;
+        if (payment.method() != PaymentMethod.CASH) return null;
 
         return payment.amountReceived().subtract(payment.amountDue());
     }
