@@ -531,7 +531,27 @@ flowchart LR
 
 | 순서 | 항목 | 커밋 | 비고 |
 |---|---|---|---|
-| | | | |
+| 1 | B7 결제 ID 연결 | `f63e6d6` | `cashPaymentId_isIndependentSequence` → `cashPaymentId_matchesPaymentId` |
+| 1-1 | POS 2대 동시 결제·반품 테스트 | `c266255` | 신규 `ConcurrentPosIntegrationTest` |
+| 1-2 | IMMEDIATE + busy_timeout 설정 | `5d9d328` | 드라이버 속성으로 설정 (아래 메모) |
+| 2 | B6 반품 트랜잭션 | `e68950d` | `refund_isNotAtomic`(@Disabled) → `refund_isAtomic` |
+| 3 | B16 TR_JSON saleId | `bf74360` | |
+
+### 배치 1 메모
+
+- 테스트: 27개(스킵 1) → **28개(스킵 0)**. 늘어난 1개는 동시성 테스트, 스킵이 없어진 것은 `refund_isAtomic` 활성화
+- 각 항목은 실패 테스트가 **의도한 이유로** 빨간 것을 먼저 확인했다
+  - B7: 두 번째 결제의 `PAYMENT_ID`로 현금 상세를 찾으면 0건
+  - B6: 주입한 실패(`injected failure`)는 나지만 반품 SALES 1건이 남음
+  - B16: TR_JSON `saleId`가 0(null)
+  - 1-1 동시성 테스트는 계획대로 지금 코드에서 초록 (4회 반복 통과)
+- **동시성 테스트가 실제 문제를 잡는지 확인**: B6(`@Transactional`)만 임시로 넣고 IMMEDIATE 설정 없이 돌리면 **3회 중 3회 `SQLITE_BUSY`** 로 실패. 설정을 넣으면 3회 중 3회 통과. 확인 후 임시 변경은 되돌렸고, 커밋 순서(테스트 → 설정 → B6)대로 다시 적용함
+- **계획과 달라진 점 (1-2)**: 계획은 URL에 `transaction_mode`·`busy_timeout`을 붙이는 것이었으나, `spring.datasource.hikari.data-source-properties`(드라이버 속성)로 넣었다
+  - 이유: URL에 붙이면 `POS_DB_URL`로 운영 URL을 넘길 때마다 같은 파라미터를 직접 붙여야 하고, 빠뜨리면 조용히 기본값(DEFERRED)으로 돌아간다. 드라이버 속성은 URL과 별개로 항상 적용된다
+  - 확인: 테스트 컨텍스트에서 `PRAGMA busy_timeout = 5000`, URL의 `foreign_keys=1`도 그대로 유지
+  - 그래서 `application-test.yml`은 바꾸지 않았고(기본 설정을 상속), CLAUDE.md는 "명령어" 절 대신 "DB" 절에 설정 설명 한 줄을 추가했다
+- B7: 복원한 `CommonPaymentData`에 `paymentId`를 채우지만, 응답·TR_JSON에는 노출하지 않는다 (계획대로)
+- 계획에 없는 테스트 기대값 변경: **없음**
 
 ## 8. 실험 기록
 
