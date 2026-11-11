@@ -17,18 +17,29 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
 
     @Test
-    @DisplayName("[현재 동작/버그] 받은 금액이 결제액보다 적어도 승인되고 거스름돈이 음수로 저장된다")
-    void insufficientCash_isApproved() throws Exception {
+    @DisplayName("받은 금액이 결제액보다 적으면 IllegalArgumentException(500), 저장 없음, 장바구니 유지")
+    void insufficientCash_isRejected() throws Exception {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS); // 1500
 
-        JsonNode sale = json(checkoutCash(POS_1, tranNo, 1000));
+        assertThatThrownBy(() -> checkoutCash(POS_1, tranNo, 1000))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasRootCauseMessage("받은 금액이 결제 금액보다 적습니다.");
+
+        assertThat(countSales(POS_1, tranNo)).isZero();
+        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("받은 금액이 결제액과 같으면 승인, 거스름돈 0")
+    void exactCash_isApproved() throws Exception {
+        String tranNo = newTranNo();
+        addItem(POS_1, tranNo, CHIPS); // 1500
+
+        JsonNode sale = json(checkoutCash(POS_1, tranNo, 1500));
 
         assertThat(sale.at("/payment/status").asText()).isEqualTo("APPROVED");
-        assertThat(amt(sale.at("/payment/cash/change"))).isEqualByComparingTo("-500");
-        assertThat(amt(jdbc.queryForObject(
-                "SELECT c.CHANGE FROM CASH_PAYMENTS c JOIN PAYMENTS p ON p.PAYMENT_ID = c.PAYMENT_ID WHERE p.SALE_ID = ?",
-                Object.class, saleId(POS_1, tranNo)))).isEqualByComparingTo("-500");
+        assertThat(amt(sale.at("/payment/cash/change"))).isEqualByComparingTo("0");
     }
 
     @Test

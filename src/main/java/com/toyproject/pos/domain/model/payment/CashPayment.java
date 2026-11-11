@@ -45,10 +45,14 @@ public class CashPayment implements Payment {
         if (amountReceived.compareTo(BigDecimal.ZERO) <= 0)
             throw new IllegalArgumentException("지불 금액이 이상 합니다. 확인 부탁 드립니다.");
 
+        BigDecimal change = calculateChange(amountReceived, commonPayment.getAmountDueToPay());
+        if (change.signum() < 0)
+            throw new IllegalArgumentException("받은 금액이 결제 금액보다 적습니다.");
+
         return CashPayment.builder()
                 .commonPayment(commonPayment)
                 .amountReceived(amountReceived)
-                .change(calculateChange(amountReceived, commonPayment.getAmountDueToPay()))
+                .change(change)
                 // 현금 거래일 경우 바로 승인 처리
                 .status(PaymentEnums.PaymentStatus.APPROVED)
                 .build();
