@@ -14,6 +14,8 @@ import com.toyproject.pos.service.interfaces.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class CartServiceImpl implements CartService {
@@ -60,6 +62,16 @@ public class CartServiceImpl implements CartService {
 
         }
 
+    }
+
+    // 다중 상품 일괄 등록: 실패 상품이 있어도 나머지는 모두 담고, 전부 성공했을 때만 true
+    @Override
+    public boolean addItems(List<ProductReqDto> productReqDtoList) {
+        int count = 0;
+        for (ProductReqDto productReqDto : productReqDtoList)
+            count += (addItem(productReqDto) ? 1 : 0);
+
+        return count == productReqDtoList.size();
     }
 
     @Override

@@ -30,32 +30,13 @@ public class CartController {
     // *** 현재 임시 데이터 저장소 사용 -> 추후 실제 DB로 이주 계획
     @PostMapping("/item/add")
     public ResponseEntity<ApiResponseDto> addToCart(@RequestBody ProductReqDto productReqDto) {
-        boolean result = cartService.addItem(productReqDto);
-
-        return ResponseEntity.ok(new ApiResponseDto(
-                        result ? "상품 추가 성공" : "미등록 상품",
-                        result ? HttpStatus.OK.value() : HttpStatus.NOT_FOUND.value()
-                )
-        );
-
+        return toAddItemResponse(cartService.addItem(productReqDto));
     }
 
     // 다중 상품 일괄 등록
     @PostMapping("/item/add/many")
     public ResponseEntity<ApiResponseDto> addToCart(@RequestBody List<ProductReqDto> productReqDtoList) {
-
-        int count = 0;
-        for (ProductReqDto productReqDto : productReqDtoList)
-            count += (cartService.addItem(productReqDto) ? 1 : 0);
-
-        boolean result = count == (long) productReqDtoList.size();
-
-        return ResponseEntity.ok(new ApiResponseDto(
-                        result ? "상품 추가 성공" : "미등록 상품",
-                        result ? HttpStatus.OK.value() : HttpStatus.NOT_FOUND.value()
-                )
-        );
-
+        return toAddItemResponse(cartService.addItems(productReqDtoList));
     }
 
     // 상품 수량 업데이트
@@ -75,6 +56,15 @@ public class CartController {
     public boolean cancelLine(@RequestBody ProductReqDto productReqDto) {
         return cartService.cancelLine(productReqDto);
 
+    }
+
+    // 상품 추가 결과 응답 (HTTP 200 고정, 바디 status로 성공/미등록 구분)
+    private static ResponseEntity<ApiResponseDto> toAddItemResponse(boolean result) {
+        return ResponseEntity.ok(new ApiResponseDto(
+                        result ? "상품 추가 성공" : "미등록 상품",
+                        result ? HttpStatus.OK.value() : HttpStatus.NOT_FOUND.value()
+                )
+        );
     }
 
 }

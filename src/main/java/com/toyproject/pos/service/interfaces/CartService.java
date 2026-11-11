@@ -6,6 +6,8 @@ import com.toyproject.pos.domain.model.cart.Cart;
 import com.toyproject.pos.domain.model.cart.CartKey;
 import com.toyproject.pos.domain.model.sale.Sale;
 
+import java.util.List;
+
 public interface CartService {
 
     Cart getCurrentCart(CartInfoReqDto cartInfoReqDto);
@@ -13,6 +15,8 @@ public interface CartService {
     Cart getCurrentCart(CartKey cartKey);
 
     boolean addItem(ProductReqDto productReqDto);
+
+    boolean addItems(List<ProductReqDto> productReqDtoList);
 
     boolean updatedQty(ProductReqDto productReqDto);
 
