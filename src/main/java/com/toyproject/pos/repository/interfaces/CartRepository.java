@@ -15,8 +15,6 @@ public interface CartRepository {
 
     boolean updateStatusToCancel(CartKey cartKey, String barcode);
 
-    boolean isCanceledItem(CartKey cartKey, String barcode);
-
     void clearCartStore(Sale sale);
 
 }

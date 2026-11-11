@@ -68,7 +68,7 @@ public class CartServiceImpl implements CartService {
         String barcode = productReqDto.getBarcode();
         CartKey cartKey = productReqDto.getKey();
 
-        if (qty <= 0 || cartRepository.isCanceledItem(cartKey, barcode)) return false;
+        if (qty <= 0) return false;
 
         return cartRepository.updateItemQty(cartKey, barcode, qty);
 
