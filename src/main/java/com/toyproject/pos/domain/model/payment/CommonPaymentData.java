@@ -12,7 +12,7 @@ import java.time.ZoneId;
 
 @Getter
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class CommonPaymentData {
 
     private final Long paymentId;
@@ -45,6 +45,14 @@ public class CommonPaymentData {
             String approvedAt
     ) {
         return create(paymentId, cartKey, amountDueToPay, method, approvedAt, approvedAt);
+    }
+
+    // 반품 결제: 청구액을 음수로 (반품 SALES·SALE_LINES 금액과 같은 부호)
+    public CommonPaymentData refundOf() {
+        return this.toBuilder()
+                .paymentId(null)
+                .amountDueToPay(amountDueToPay.negate())
+                .build();
     }
 
     private static CommonPaymentData create(

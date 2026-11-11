@@ -110,6 +110,10 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
         assertThat(refund.get("tranNo").asText()).isEqualTo(refundTranNo);
         assertThat(refund.at("/cart/totalQty").asInt()).isEqualTo(-5);
         assertThat(amt(refund.at("/cart/totalAmount"))).isEqualByComparingTo("-10500");
+        // 반품은 결제액만큼 환불: 청구액·받은 금액 모두 음수, 거스름돈 0
+        assertThat(amt(refund.at("/payment/amountDueToPay"))).isEqualByComparingTo("-10500");
+        assertThat(amt(refund.at("/payment/cash/amountReceived"))).isEqualByComparingTo("-10500");
+        assertThat(amt(refund.at("/payment/cash/change"))).isEqualByComparingTo("0");
 
         Map<String, Object> refundRow = saleRow(POS_1, refundTranNo);
         long refundSaleId = ((Number) refundRow.get("SALE_ID")).longValue();
@@ -125,14 +129,13 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
 
         Map<String, Object> refundPayment = jdbc.queryForMap("SELECT * FROM PAYMENTS WHERE SALE_ID = ?", refundSaleId);
         assertThat(refundPayment.get("STATUS")).isEqualTo("REFUNDED");
-        // [현재 동작] 반품 결제의 청구액은 양수 그대로
-        assertThat(amt(refundPayment.get("AMOUNT_DUE_TO_PAY"))).isEqualByComparingTo("10500");
+        assertThat(amt(refundPayment.get("AMOUNT_DUE_TO_PAY"))).isEqualByComparingTo("-10500");
 
         Map<String, Object> refundCash = jdbc.queryForMap(
                 "SELECT * FROM CASH_PAYMENTS WHERE PAYMENT_ID = ?", refundPayment.get("PAYMENT_ID"));
-        // [현재 동작/버그] 결제액(10500)이 아니라 받은 돈(20000)을 환불하고, 거스름돈은 -20000 - 10500 = -30500
-        assertThat(amt(refundCash.get("AMOUNT_RECEIVED"))).isEqualByComparingTo("-20000");
-        assertThat(amt(refundCash.get("CHANGE"))).isEqualByComparingTo("-30500");
+        // 받은 돈(20000)이 아니라 결제액(10500)을 환불
+        assertThat(amt(refundCash.get("AMOUNT_RECEIVED"))).isEqualByComparingTo("-10500");
+        assertThat(amt(refundCash.get("CHANGE"))).isEqualByComparingTo("0");
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM RECEIPT_JOURNAL WHERE SALE_ID = ?", Integer.class, refundSaleId))
                 .isEqualTo(1);

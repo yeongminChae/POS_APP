@@ -59,11 +59,16 @@ public class CashPayment implements Payment {
         return amountReceived.subtract(amountDue);
     }
 
-    public Payment refundOf(BigDecimal amountReceived) {
+    // 반품: 환불액만큼 음수로 돌려줌. 청구액도 음수라 거스름돈 = (-환불액) - (-청구액)
+    public Payment refundOf(BigDecimal amountToRefund) {
+        CommonPaymentData refundCommon = commonPayment.refundOf();
+        BigDecimal refundReceived = amountToRefund.negate();
+
         return this.toBuilder()
+                .commonPayment(refundCommon)
                 .status(PaymentEnums.PaymentStatus.REFUNDED)
-                .amountReceived(amountReceived.negate()) // negate 음수로 바꿔줌
-                .change(BigDecimal.ZERO)
+                .amountReceived(refundReceived)
+                .change(calculateChange(refundReceived, refundCommon.getAmountDueToPay()))
                 .build();
     }
 

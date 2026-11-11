@@ -134,8 +134,9 @@ public class CheckoutServiceImpl implements CheckoutService {
         return cartService.getCurrentCart(paymentReq.getKey());
     }
 
+    // 받은 돈이 아니라 결제액만큼 환불
     private static Payment getRefund(Payment originalPayment) {
-        return originalPayment.refund(originalPayment.amountReceived());
+        return originalPayment.refund(originalPayment.amountDue());
     }
 
 }
