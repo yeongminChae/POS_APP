@@ -299,3 +299,22 @@ R1 ~ R12 (아래 4장)
 | 2 | R2 거래 키 추출 | `870e6a0` | |
 | 3 | R3 enum 비교 | `d25853f` | |
 | 4 | R4 죽은 판정 제거 | `c5d2bd7` | |
+| 5 | R7 날짜 포맷 유틸 | `03f25e5` | 신규 `common/util/DateFormatUtil.java` |
+| 6 | R6 거스름돈 단일화 | `cafc112` | `CashPayment.calculateChange` |
+| 7 | R8 결제 공통 정보 팩토리 | `f99b4dd` | `CommonPaymentData.restoredOf` |
+| 8 | R5 카트 중복 조회 제거 | `65f792a` | |
+
+### 배치 2 (R7 → R6 → R8 → R5) 계획 수정 사항 / 메모
+
+- **R7**: 신규 유틸 위치는 `common/util/DateFormatUtil.java`(새 패키지). 메서드는 `nowDate(ZoneId)`(yyyyMMdd), `nowDateTime(ZoneId)`(yyyy-MM-dd HH:mm:ss). 타임존은 호출부 3곳(`Sale`, `RefundDetail`: systemDefault / `CommonPaymentData`: Asia/Seoul)에 인자로 남아 있음 → B15는 이 3곳의 인자만 바꾸면 됨.
+- **R6**: 공식은 `CashPayment.calculateChange(받은 돈, 결제액)` 한 곳. `static`이라 TR_JSON 직렬화 결과에 영향 없음. `CashPaymentRow`의 "현금 아니면 null" 분기는 도달 불가라 제거(배치 1 메모대로). `CashPayloadDto`가 현금이 아닐 때도 생성되는 문제(L7/A7)는 그대로.
+- **R8**: 복원 시 `requestedAt`을 `approvedAt`으로 채우고 `paymentId`를 null로 두는 기존 동작을 그대로 유지. `of`/`restoredOf`는 private `create`를 공유.
+- **R5**: 컨트롤러용 `getSaleSummary`(요약 API)는 인터페이스 메서드라 유지하고 내부 헬퍼 `getCurrentCart`만 쓰도록 정리. 결제 흐름의 카트 조회는 2회 → 1회.
+- **라인 번호**: `CheckoutServiceImpl`이 바뀌어 R9·R10·R12의 근거 라인이 어긋남. 현재 기준 `callTransaction` :61, `refundTransaction` :72, `getRefundCartSummary` :99, `getRefund` :136.
+
+다음 배치에서 처리할 것 (버그·API는 메모만, 손대지 않음):
+- **B8 수정 지점**: `SaleRowMapper.getPaymentSummary`가 여전히 생성용 `CashPayment.of`로 복원함(양수 검증에 걸림). R8과 같은 방식으로 `CashPayment.restoredOf`(저장된 change 사용)를 만들면 되지만, 반품 거래의 change 값이 바뀌므로 B2와 함께 `fix`로 처리할 것.
+- **B3 수정 지점**: `CashPayment.of`에서 `calculateChange` 결과가 음수면 거절하도록 바꾸면 됨.
+- **B7 메모**: `CommonPaymentData.restoredOf`도 `paymentId`를 null로 둠. B7(PAYMENT_ID 생성키) 수정 시 `restoredOf`에 `paymentId` 인자를 추가할 것.
+- **사소한 동작 메모**: `CommonPaymentData.of`는 `dateTimeFormat()`을 두 번 호출해 초 경계에서 `requestedAt`·`approvedAt`이 1초 다를 수 있음. 동작 보존을 위해 그대로 둠(필요하면 버그 수정으로 분리).
+- **R9 참고**: `getRefundCartSummary`의 버려지는 `CartSummary.of(...)` 생성은 R9에서 제거 예정 그대로.
