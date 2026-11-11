@@ -26,24 +26,21 @@ public class Sale {
     private final RefundDetail refundDetail;
 
     public static Sale of(CartSummary cartSummary, Payment payment) {
-        return Sale.builder()
-                .saleId(null)
-                .receiptNo(getReceiptNo(cartSummary))
-                .storeCd(cartSummary.getStrCd())
-                .posNo(cartSummary.getPosNo())
-                .tranNo(cartSummary.getTranNo())
-                .cashier("테스터")
-                .saleStatus(SaleStatus.NORMAL)
-                .cartSummary(cartSummary)
-                .payment(payment)
-                .refundDetail(null)
-                .build()
-                ;
+        return create(cartSummary, payment, SaleStatus.NORMAL, null);
     }
 
     public static Sale refundedOf(
             CartSummary cartSummary,
             Payment payment,
+            RefundDetail refundDetail
+    ) {
+        return create(cartSummary, payment, SaleStatus.REFUNDED, refundDetail);
+    }
+
+    private static Sale create(
+            CartSummary cartSummary,
+            Payment payment,
+            SaleStatus saleStatus,
             RefundDetail refundDetail
     ) {
         return Sale.builder()
@@ -53,11 +50,12 @@ public class Sale {
                 .posNo(cartSummary.getPosNo())
                 .tranNo(cartSummary.getTranNo())
                 .cashier("테스터")
-                .saleStatus(SaleStatus.REFUNDED)
+                .saleStatus(saleStatus)
                 .cartSummary(cartSummary)
                 .payment(payment)
                 .refundDetail(refundDetail)
-                .build();
+                .build()
+                ;
     }
 
     private static String getReceiptNo(CartSummary cartSummary) {

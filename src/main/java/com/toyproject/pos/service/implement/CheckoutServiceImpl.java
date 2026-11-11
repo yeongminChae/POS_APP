@@ -83,7 +83,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // 반품 거래로 상태 바뀐 모델 생성
         CartKey newTranKey = refundReqDto.getCartInfoReqDto().getKey();
-        CartSummary refundCartSummary = getRefundCartSummary(refundedCart, newTranKey);
+        CartSummary refundCartSummary = CartSummary.refundOf(refundedCart, newTranKey);
         Payment refundPayment = getRefund(sale.getPayment());
 
         // 반품 거래 생성 및 DB에 저장
@@ -94,12 +94,6 @@ public class CheckoutServiceImpl implements CheckoutService {
         SaleResDto saleResDto = SaleResDto.of(refundSale);
 
         return saleResDto.withOriginSaleId(sale.getSaleId());
-    }
-
-    private static CartSummary getRefundCartSummary(Cart refundedCart, CartKey cartKey) {
-        CartSummary cartSummary = CartSummary.of(refundedCart);
-
-        return cartSummary.refundOf(refundedCart, cartKey);
     }
 
     // 카트는 한 번만 조회해서 요약·결제액 계산에 함께 사용

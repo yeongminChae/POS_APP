@@ -20,29 +20,26 @@ public class CartSummary {
     private final List<CartLine> lines;
 
     public static CartSummary of(Cart cart) {
-        return CartSummary.builder()
-                .strCd(cart.getStrCd())
-                .posNo(cart.getPosNo())
-                .tranNo(cart.getTranNo())
-                .totalAmount(cart.getTotalAmountInLines())
-                .totalQty(cart.getTotalQtyInLines())
-                .lines(cart.getLinesList())
-                .build()
-                ;
-
+        return create(cart.getStrCd(), cart.getPosNo(), cart.getTranNo(), cart, false);
     }
 
-    public CartSummary refundOf(Cart cart, CartKey cartKey) {
+    // 반품 요약: 새 거래 키 + REFUNDED 라인 합계
+    public static CartSummary refundOf(Cart cart, CartKey cartKey) {
+        return create(cartKey.getStrCd(), cartKey.getPosNo(), cartKey.getTranNo(), cart, true);
+    }
+
+    private static CartSummary create(
+            String strCd, String posNo, String tranNo, Cart cart, boolean isRefunded
+    ) {
         return CartSummary.builder()
-                .strCd(cartKey.getStrCd())
-                .posNo(cartKey.getPosNo())
-                .tranNo(cartKey.getTranNo())
-                .totalAmount(cart.getTotalAmountInLines(true))
-                .totalQty(cart.getTotalQtyInLines(true))
+                .strCd(strCd)
+                .posNo(posNo)
+                .tranNo(tranNo)
+                .totalAmount(cart.getTotalAmountInLines(isRefunded))
+                .totalQty(cart.getTotalQtyInLines(isRefunded))
                 .lines(cart.getLinesList())
                 .build()
                 ;
-
     }
 
 }
