@@ -50,4 +50,14 @@ dependencyManagement {
 
 tasks.named('test') {
     useJUnitPlatform()
+
+    // 테스트는 항상 test 프로필(임시 SQLite)로 실행 — 운영 DB 접근 방지
+    systemProperty 'spring.profiles.active', 'test'
+
+    // 매 실행마다 빈 테스트 DB에서 시작 (sqlite-jdbc 는 상위 디렉터리를 만들지 않음)
+    def testDbDir = layout.buildDirectory.dir('test-db')
+    doFirst {
+        delete testDbDir
+        testDbDir.get().asFile.mkdirs()
+    }
 }
