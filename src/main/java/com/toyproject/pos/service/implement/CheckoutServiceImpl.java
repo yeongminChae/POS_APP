@@ -59,11 +59,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
     @Override
     public SaleResDto callTransaction(CartInfoReqDto cartInfoReqDto) {
-        CartKey cartKey = cartInfoReqDto.getKey();
-
-        Cart cart = checkoutRepository.getCart(cartKey);
-        Payment payment = checkoutRepository.getPayment(cartKey);
-        Sale sale = checkoutRepository.getTransaction(cartKey, cart, payment);
+        Sale sale = loadTransaction(cartInfoReqDto.getKey()).sale();
 
         return SaleResDto.of(sale);
     }
@@ -71,12 +67,9 @@ public class CheckoutServiceImpl implements CheckoutService {
     @Override
     public SaleResDto refundTransaction(RefundReqDto refundReqDto) {
         // 기존 거래 정보 호출
-        CartKey refundCartKey = refundReqDto.getRefundInfoKey();
-
-        Cart refundedCart = checkoutRepository.getCart(refundCartKey);
-        Payment refundedPayment = checkoutRepository.getPayment(refundCartKey);
-        Sale sale = checkoutRepository.getTransaction(
-                refundCartKey, refundedCart, refundedPayment);
+        StoredTransaction origin = loadTransaction(refundReqDto.getRefundInfoKey());
+        Cart refundedCart = origin.cart();
+        Sale sale = origin.sale();
 
         // 기존 거래 반품 거래로 상태 변경
         refundedCart.refundAll();
@@ -94,6 +87,19 @@ public class CheckoutServiceImpl implements CheckoutService {
         SaleResDto saleResDto = SaleResDto.of(refundSale);
 
         return saleResDto.withOriginSaleId(sale.getSaleId());
+    }
+
+    // DB에 저장된 거래를 카트·결제·판매 순으로 복원 (조회·반품 공통)
+    private StoredTransaction loadTransaction(CartKey cartKey) {
+        Cart cart = checkoutRepository.getCart(cartKey);
+        Payment payment = checkoutRepository.getPayment(cartKey);
+        Sale sale = checkoutRepository.getTransaction(cartKey, cart, payment);
+
+        return new StoredTransaction(cart, sale);
+    }
+
+    // 반품은 복원한 Cart를 refundAll 해야 하므로 Sale과 함께 반환
+    private record StoredTransaction(Cart cart, Sale sale) {
     }
 
     // 카트는 한 번만 조회해서 요약·결제액 계산에 함께 사용
