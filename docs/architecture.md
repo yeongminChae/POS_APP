@@ -2,6 +2,7 @@
 
 > 기준 커밋: `d2a038f` · 작성 시점의 코드만 분석했고 코드는 수정하지 않았다.
 > 라인 번호는 `src/main/java/com/toyproject/pos/` 기준 상대 경로다.
+> 1·2·4장의 라인 번호는 기준 커밋(`d2a038f`) 시점이다. **3장(버그·API 표)의 라인 번호는 리팩토링 완료 커밋 `9fd71ef` 기준으로 보정했다.**
 > 현재 동작은 `src/test/java/com/toyproject/pos/integration/` 통합 테스트 24개로 고정되어 있다.
 
 ## 1. 현재 아키텍처
@@ -202,33 +203,33 @@ R1 ~ R12 (아래 4장)
 ### 3.2 버그 수정 (동작이 바뀜 — 해당 `[현재 동작/버그]` 테스트의 기대값을 바꿔야 함)
 | ID | 내용 | 근거 | 깨질 테스트 |
 |---|---|---|---|
-| B1 | 카트 키가 `tranNo`만 사용 → POS·점포 간 섞임 | `CartRepositoryImpl.java:25`, `:34`, `:64` | `CartIntegrationTest.sameTranNo_differentPos_sharesCart`, `sameTranNo_differentStore_sharesCart` |
-| B2 | 반품 시 받은 돈 전체 환불, 거스름돈 음수 이중 계산 | `CheckoutServiceImpl.java:142-144`, `CashPayment.java:57-63`, `CashPaymentRow.java:30` | `CheckoutScenarioIntegrationTest.fullScenario` |
-| B3 | 받은 금액 부족해도 승인 | `CashPayment.java:44-50` | `CheckoutEdgeIntegrationTest.insufficientCash_isApproved` |
-| B4 | 원거래 상태 미갱신 → 중복 반품 가능 | `CheckoutServiceImpl.java:73-99` | `refundTwice_isAllowed`, `fullScenario`(원거래 NORMAL 검증) |
-| B5 | 빈 카트 결제 허용 | `CheckoutServiceImpl.java:42-60` | `emptyCart_isCheckedOut` |
-| B6 | 반품 트랜잭션 없음 (T1) | `CheckoutServiceImpl.java:73` | `refund_isNotAtomic`(@Disabled) |
-| B7 | `CASH_PAYMENTS.PAYMENT_ID`를 PAYMENTS 생성키로 넣지 않음 | `persistence/row/PaymentRow.java`(`paymentId(null)`), `CashPaymentRow.java:21`, `resources/mapper/CheckoutMapper.xml` `insertPayment`(useGeneratedKeys 없음) | `cashPaymentId_isIndependentSequence` |
+| B1 | 카트 키가 `tranNo`만 사용 → POS·점포 간 섞임 | `CartRepositoryImpl.java:24`, `:33`, `:57` | `CartIntegrationTest.sameTranNo_differentPos_sharesCart`, `sameTranNo_differentStore_sharesCart` |
+| B2 | 반품 시 받은 돈 전체 환불, 거스름돈 음수 이중 계산 | `CheckoutServiceImpl.java:136-138`(`getRefund`), `CashPayment.java:62-68`(`refundOf`), `CashPaymentRow.java:24` | `CheckoutScenarioIntegrationTest.fullScenario` |
+| B3 | 받은 금액 부족해도 승인 | `CashPayment.java:39-56` (`:45`는 0 이하만 거절) | `CheckoutEdgeIntegrationTest.insufficientCash_isApproved` |
+| B4 | 원거래 상태 미갱신 → 중복 반품 가능 | `CheckoutServiceImpl.java:67-90` | `refundTwice_isAllowed`, `fullScenario`(원거래 NORMAL 검증) |
+| B5 | 빈 카트 결제 허용 | `CheckoutServiceImpl.java:38-58`, 검사 지점 `:106-113`(`saleModelBuilder`) | `emptyCart_isCheckedOut` |
+| B6 | 반품 트랜잭션 없음 (T1) | `CheckoutServiceImpl.java:67` | `refund_isNotAtomic`(@Disabled) |
+| B7 | `CASH_PAYMENTS.PAYMENT_ID`를 PAYMENTS 생성키로 넣지 않음 | `persistence/row/PaymentRow.java`(`paymentId(null)`), `CashPaymentRow.java:22`, `CommonPaymentData.java:39`(`restoredOf`), `resources/mapper/CheckoutMapper.xml` `insertPayment`(useGeneratedKeys 없음) | `cashPaymentId_isIndependentSequence` |
 | B8 | 반품 거래 조회 불가 (복원에 생성 팩토리 사용) | `SaleRowMapper.java:53-58` | `callRefundTransaction_throws` |
-| B9 | 없는 거래·카드 결제에서 NPE | `CheckoutRepositoryImpl.java:84-92`, `CheckoutServiceImpl.java:114-129` | `callUnknownTransaction_throwsNpe`, `cardPayment_throwsNpe` |
-| B10 | 예외를 삼켜 DB 오류도 "미등록 상품" (L10) | `CartServiceImpl.java:56-60` | (없음 — 테스트 추가 필요) |
-| B11 | 결제 끝난 tranNo에 다시 담기 가능 → UNIQUE 위반 | `CartRepositoryImpl.java:23-41` | `reuseTranNoAfterCheckout_violatesUnique` |
-| B12 | 성인 인증·판매 상태·재고 검사 없음, 재고 차감 없음 | `CartServiceImpl.java:38-61`, `resources/mapper/ProductMapper.xml` `findByBarcode` | `adultOnlyProduct_isAddedWithoutCheck`, `discontinuedProduct_isSellable`, `checkout_doesNotDecreaseStock` |
-| B13 | `qty` 누락 시 NPE (`@Builder.Default`가 역직렬화에 안 먹음) | `domain/dto/product/request/ProductReqDto.java`, `CartServiceImpl.java:67` | `updateQty_withoutQtyField_throwsNpe` |
-| B14 | 반품 사유 무시, 계산원 하드코딩 (L9) | `RefundDetail.java:25`, `Sale.java:36,56` | `refundReason_isIgnored`, `fullScenario`(CASHIER) |
-| B15 | 타임존 불일치 (영수증 날짜 systemDefault vs 결제 시각 Asia/Seoul) | D3 근거 | (없음 — 서버 TZ가 KST면 드러나지 않음) |
-| B16 | TR_JSON의 `saleId`가 null (저장 전 직렬화) | `CheckoutRepositoryImpl.java:47-48`, `:113-124` | `fullScenario`(trJson saleId null 검증) |
+| B9 | 없는 거래·카드 결제에서 NPE | `CheckoutRepositoryImpl.java:83-93`(`:89`), `CheckoutServiceImpl.java:115-130` | `callUnknownTransaction_throwsNpe`, `cardPayment_throwsNpe` |
+| B10 | 예외를 삼켜 DB 오류도 "미등록 상품" (L10) | `CartServiceImpl.java:58-62` | (없음 — 테스트 추가 필요) |
+| B11 | 결제 끝난 tranNo에 다시 담기 가능 → UNIQUE 위반 | `CartRepositoryImpl.java:21-41` | `reuseTranNoAfterCheckout_violatesUnique` |
+| B12 | 성인 인증·판매 상태·재고 검사 없음, 재고 차감 없음 | `CartServiceImpl.java:38-65`(주석 처리된 재고 갱신 `:52-54`), `resources/mapper/ProductMapper.xml` `findByBarcode` | `adultOnlyProduct_isAddedWithoutCheck`, `discontinuedProduct_isSellable`, `checkout_doesNotDecreaseStock` |
+| B13 | `qty` 누락 시 NPE (`@Builder.Default`가 역직렬화에 안 먹음) | `domain/dto/product/request/ProductReqDto.java`, `CartServiceImpl.java:79-83` | `updateQty_withoutQtyField_throwsNpe` |
+| B14 | 반품 사유 무시, 계산원 하드코딩 (L9) | `RefundDetail.java:24`, `Sale.java:52` (`create` 한 곳으로 모임) | `refundReason_isIgnored`, `fullScenario`(CASHIER) |
+| B15 | 타임존 불일치 (영수증 날짜 systemDefault vs 결제 시각 Asia/Seoul) | `Sale.java:63`, `RefundDetail.java:23`, `CommonPaymentData.java:68` | (없음 — 서버 TZ가 KST면 드러나지 않음) |
+| B16 | TR_JSON의 `saleId`가 null (저장 전 직렬화) | `CheckoutRepositoryImpl.java:48`, `:111-124` | `fullScenario`(trJson saleId null 검증) |
 | B17 | enum ↔ DB CHECK 불일치 | `docs/schema-issues.md` 7번 | (없음) |
 
 ### 3.3 API 변경 (요청/응답 계약이 바뀜)
 | ID | 내용 | 근거 | 깨질 테스트 |
 |---|---|---|---|
-| A1 | GET + RequestBody → 쿼리 파라미터/경로 변수 | `controller/CartController.java:25-26`, `controller/CheckoutController.java:22-31` | `PosApiTestSupport`의 `getCart`, `callTransaction` 및 이를 쓰는 대부분 |
-| A2 | 요약 API 경로 변수가 무시됨 → 경로 변수 사용 | `controller/CheckoutController.java:22-24` | `summary_ignoresPathVariables` |
-| A3 | 응답 형식 통일 (`ApiResponseDto` / `boolean` / 도메인 객체 혼재) | `CartController.java:26,33,64,76`, `CheckoutController.java:23` | 카트 관련 테스트 전반 |
-| A4 | 실패를 HTTP 상태로 표현 (미등록 404, 검증 실패 400, 전역 `@RestControllerAdvice`) | `CartController.java:36-39`, 예외 처리기 없음 | `unknownBarcode_returns200WithBody404`, 예외를 기대하는 테스트 전부 |
-| A5 | 카트 응답을 전용 DTO로 (내부 필드 `barcodeToLineMap`, `seq` 노출 제거) | `CartController.java:26` (도메인 `Cart` 직접 반환) | `getCart_exposesInternals`, `fullScenario`(`linesList` 키) |
-| A6 | 요청 검증 추가 (`@Valid`, `qty >= 1` — 미사용 `UpdateQtyRequest` 활용 가능) | `CartController.java:64-71`, `UpdateQtyRequest.java` | `updateQty_rejectedCases`, `updateQty_withoutQtyField_throwsNpe` |
+| A1 | GET + RequestBody → 쿼리 파라미터/경로 변수 | `controller/CartController.java:24-25`, `controller/CheckoutController.java:21-29` | `PosApiTestSupport`의 `getCart`, `callTransaction` 및 이를 쓰는 대부분 |
+| A2 | 요약 API 경로 변수가 무시됨 → 경로 변수 사용 | `controller/CheckoutController.java:21-22` | `summary_ignoresPathVariables` |
+| A3 | 응답 형식 통일 (`ApiResponseDto` / `boolean` / 도메인 객체 혼재) | `CartController.java:25,32,38,44,56`, `CheckoutController.java:22` | 카트 관련 테스트 전반 |
+| A4 | 실패를 HTTP 상태로 표현 (미등록 404, 검증 실패 400, 전역 `@RestControllerAdvice`) | `CartController.java:61-68`(`toAddItemResponse`), 예외 처리기 없음 | `unknownBarcode_returns200WithBody404`, 예외를 기대하는 테스트 전부 |
+| A5 | 카트 응답을 전용 DTO로 (내부 필드 `barcodeToLineMap`, `seq` 노출 제거) | `CartController.java:25` (도메인 `Cart` 직접 반환) | `getCart_exposesInternals`, `fullScenario`(`linesList` 키) |
+| A6 | 요청 검증 추가 (`@Valid`, `qty >= 1` — 미사용 `UpdateQtyRequest` 활용 가능) | `CartController.java:43-52`, `UpdateQtyRequest.java` | `updateQty_rejectedCases`, `updateQty_withoutQtyField_throwsNpe` |
 | A7 | 현금이 아닐 때 `payment.cash`를 null로 | `PaymentResDto.java:29` | (현재 현금만 있어 없음) |
 
 ## 4. 리팩토링 항목
@@ -303,6 +304,10 @@ R1 ~ R12 (아래 4장)
 | 6 | R6 거스름돈 단일화 | `cafc112` | `CashPayment.calculateChange` |
 | 7 | R8 결제 공통 정보 팩토리 | `f99b4dd` | `CommonPaymentData.restoredOf` |
 | 8 | R5 카트 중복 조회 제거 | `65f792a` | |
+| 9 | R9 팩토리 중복 정리 | `c8f602e` | `Sale.create`, `CartSummary.create` |
+| 10 | R10 거래 복원 중복 제거 | `b6de112` | `CheckoutServiceImpl.loadTransaction` |
+| 11 | R12 판매 조립 서비스 이동 | `e53ccf5` | `getTransaction(CartKey, CartSummary, Payment)` |
+| 12 | R11 일괄 등록 서비스 이동 | `9fd71ef` | `CartService.addItems`, `CartController.toAddItemResponse` |
 
 ### 배치 2 (R7 → R6 → R8 → R5) 계획 수정 사항 / 메모
 
@@ -318,3 +323,13 @@ R1 ~ R12 (아래 4장)
 - **B7 메모**: `CommonPaymentData.restoredOf`도 `paymentId`를 null로 둠. B7(PAYMENT_ID 생성키) 수정 시 `restoredOf`에 `paymentId` 인자를 추가할 것.
 - **사소한 동작 메모**: `CommonPaymentData.of`는 `dateTimeFormat()`을 두 번 호출해 초 경계에서 `requestedAt`·`approvedAt`이 1초 다를 수 있음. 동작 보존을 위해 그대로 둠(필요하면 버그 수정으로 분리).
 - **R9 참고**: `getRefundCartSummary`의 버려지는 `CartSummary.of(...)` 생성은 R9에서 제거 예정 그대로.
+
+### 배치 3 (R9 → R10 → R12 → R11) 계획 수정 사항 / 메모
+
+- **R9**: `CartSummary.refundOf`를 인스턴스 메서드에서 정적 메서드로 바꿈(`this`를 안 쓰던 문제). `Sale`·`CartSummary` 모두 private `create`를 공유. 계산원 `"테스터"` 하드코딩이 `Sale.create` 한 곳으로 모여 B14 수정 지점이 하나가 됨.
+- **R10**: 반품은 원거래 `Cart`를 `refundAll()` 해야 해서 `Sale`만 돌려줄 수 없음 → 서비스 내부 `private record StoredTransaction(Cart cart, Sale sale)`로 반환. 호출 순서(카트→결제→판매→refundAll)는 그대로.
+- **R10**: 배치 1 메모의 `refundReqDto.getCartInfoReqDto().getKey()`(현재 `CheckoutServiceImpl.java:78`)는 `RefundReqDto.java`가 영향 파일 목록에 없어 손대지 않음. 필요하면 별도 `refactor` 커밋으로.
+- **R12**: 계획의 "getTransaction은 SaleRow 조회만"을 그대로 하면 서비스가 `SaleRow`(persistence 타입)와 `SaleRowMapper`에 의존하게 되어 계층이 오히려 섞임. 그래서 `CartSummary.of(cart)` 생성만 서비스(`loadTransaction`)로 옮기고, Repository는 `CartSummary`를 받아 SaleRow 조회 + Row→도메인 매핑만 하도록 함.
+- **R11**: 일괄 등록은 기존처럼 실패해도 나머지를 계속 시도(단락 평가 없음), 빈 목록이면 성공. HTTP 200 고정 + 바디 status 404 구조는 그대로(A4에서 변경).
+- **해결된 문제점**: D5, D6, D7, D8, D9, D10, L1, L3, L4 (D1은 `RefundReqDto` 1곳 남음, D2·D3은 공식·포맷 단일화 완료 / 타임존 차이는 B15).
+- **남은 비(非)버그 정리 후보**: L2(`CartController` 빈 TODO — A6에서 제거), L5(결제 수단별 저장 정책 — B9/카드 구현 때), T3(afterCommit 익명 클래스 — B1 때), `CheckoutRepositoryImpl.save`의 도달 불가 `// break;`.
