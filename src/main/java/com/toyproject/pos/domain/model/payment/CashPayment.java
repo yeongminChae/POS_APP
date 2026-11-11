@@ -1,5 +1,6 @@
 package com.toyproject.pos.domain.model.payment;
 
+import com.toyproject.pos.domain.model.cart.CartKey;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -32,8 +33,8 @@ public class CashPayment implements Payment {
     }
 
     @Override
-    public Payment refund(BigDecimal amountToRefund) {
-        return refundOf(amountToRefund);
+    public Payment refund(BigDecimal amountToRefund, CartKey refundKey) {
+        return refundOf(amountToRefund, refundKey);
     }
 
     public static Payment of(
@@ -60,8 +61,8 @@ public class CashPayment implements Payment {
     }
 
     // 반품: 환불액만큼 음수로 돌려줌. 청구액도 음수라 거스름돈 = (-환불액) - (-청구액)
-    public Payment refundOf(BigDecimal amountToRefund) {
-        CommonPaymentData refundCommon = commonPayment.refundOf();
+    public Payment refundOf(BigDecimal amountToRefund, CartKey refundKey) {
+        CommonPaymentData refundCommon = commonPayment.refundOf(refundKey);
         BigDecimal refundReceived = amountToRefund.negate();
 
         return this.toBuilder()

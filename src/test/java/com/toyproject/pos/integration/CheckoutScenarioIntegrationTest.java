@@ -162,6 +162,32 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
+    @DisplayName("반품 거래의 승인 시각과 결제 거래 키는 원거래가 아니라 반품 기준이다")
+    void refund_hasOwnApprovedAtAndKey() throws Exception {
+        String tranNo = paidSale(CHIPS);
+        long origSaleId = saleId(POS_1, tranNo);
+        // 1초 경계에 기대지 않도록 원거래 승인 시각을 과거로 바꿔 둔다
+        String past = "2000-01-01 00:00:00";
+        jdbc.update("UPDATE PAYMENTS SET APPROVED_AT = ? WHERE SALE_ID = ?", past, origSaleId);
+        jdbc.update("UPDATE SALES SET APPROVED_AT = ? WHERE SALE_ID = ?", past, origSaleId);
+
+        String refundTranNo = newTranNo();
+        JsonNode refund = json(refund(POS_1, refundTranNo, POS_1, tranNo));
+        long refundSaleId = saleId(POS_1, refundTranNo);
+
+        assertThat(refund.get("approvedAt").asText()).isNotEqualTo(past);
+        assertThat(saleRow(POS_1, refundTranNo).get("APPROVED_AT")).isNotEqualTo(past);
+        assertThat(jdbc.queryForObject("SELECT APPROVED_AT FROM PAYMENTS WHERE SALE_ID = ?", String.class, refundSaleId))
+                .isNotEqualTo(past);
+        assertThat(jdbc.queryForObject("SELECT APPROVED_AT FROM RECEIPT_JOURNAL WHERE SALE_ID = ?", String.class, refundSaleId))
+                .isNotEqualTo(past);
+
+        JsonNode trJson = objectMapper.readTree(jdbc.queryForObject(
+                "SELECT TR_JSON FROM RECEIPT_JOURNAL WHERE SALE_ID = ?", String.class, refundSaleId));
+        assertThat(trJson.at("/payment/commonPayment/tranNo").asText()).isEqualTo(refundTranNo);
+    }
+
+    @Test
     @DisplayName("[현재 동작/버그] 반품 거래는 조회할 수 없다 — 음수 받은금액 검증에 걸려 500")
     void callRefundTransaction_throws() throws Exception {
         String tranNo = paidSale(CHIPS);

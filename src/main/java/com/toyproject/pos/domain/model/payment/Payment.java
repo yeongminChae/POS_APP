@@ -1,5 +1,7 @@
 package com.toyproject.pos.domain.model.payment;
 
+import com.toyproject.pos.domain.model.cart.CartKey;
+
 import java.math.BigDecimal;
 
 public interface Payment {
@@ -43,7 +45,7 @@ public interface Payment {
         return info().getAmountDueToPay();
     }
 
-    default Payment refund(BigDecimal amountToRefund) {
+    default Payment refund(BigDecimal amountToRefund, CartKey refundKey) {
         throw new UnsupportedOperationException("이 결제수단은 refund 기본 구현이 없습니다.");
     }
 
