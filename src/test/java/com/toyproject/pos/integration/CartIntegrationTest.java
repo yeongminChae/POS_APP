@@ -28,15 +28,31 @@ class CartIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 판매중지·재고 0 상품(…010)이 담기고 결제까지 된다 (재고는 음수로 차감)")
-    void discontinuedProduct_isSellable() throws Exception {
+    @DisplayName("판매중지 상품(…010)은 담을 수 없다 — HTTP 200 + 바디 status 404, 카트·재고 변화 없음")
+    void discontinuedProduct_isRejected() throws Exception {
         String tranNo = newTranNo();
 
-        assertThat(json(addItem(POS_1, tranNo, DISCONTINUED)).get("status").asInt()).isEqualTo(200);
-        JsonNode sale = json(checkoutCash(POS_1, tranNo, 5000));
+        JsonNode res = json(addItem(POS_1, tranNo, DISCONTINUED));
 
-        assertThat(sale.get("saleStatus").asText()).isEqualTo("NORMAL");
-        assertThat(stock("P010")).isEqualTo(-1); // 재고 부족이어도 판매는 막지 않고 음수 허용 (B12d 보류)
+        assertThat(res.get("status").asInt()).isEqualTo(404);
+        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
+        assertThat(stock("P010")).isZero();
+    }
+
+    @Test
+    @DisplayName("발주중단(suspend_order)·상태 없음(NULL) 상품은 판매할 수 있다")
+    void suspendOrderAndNullStatus_areSellable() throws Exception {
+        String original = jdbc.queryForObject("SELECT PRODUCT_STATUS FROM PRODUCT WHERE PRODUCT_ID = 'P004'", String.class);
+        try {
+            for (String status : new String[]{"suspend_order", null}) {
+                jdbc.update("UPDATE PRODUCT SET PRODUCT_STATUS = ? WHERE PRODUCT_ID = 'P004'", status);
+                String tranNo = newTranNo();
+
+                assertThat(json(addItem(POS_1, tranNo, "8800000000004")).get("status").asInt()).isEqualTo(200);
+            }
+        } finally {
+            jdbc.update("UPDATE PRODUCT SET PRODUCT_STATUS = ? WHERE PRODUCT_ID = 'P004'", original);
+        }
     }
 
     @Test

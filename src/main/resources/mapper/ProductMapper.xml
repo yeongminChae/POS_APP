@@ -10,6 +10,7 @@
              , p.PRICE
              , p.BRAND_ID
              , p.CATEGORY_ID
+             , p.PRODUCT_STATUS
         --        , p.EXPIRY_DATEF
         --        , p.IS_ADULT_ONLY
         from PRODUCT p

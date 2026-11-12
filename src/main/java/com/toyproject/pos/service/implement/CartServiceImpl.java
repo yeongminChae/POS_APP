@@ -101,6 +101,10 @@ public class CartServiceImpl implements CartService {
         if (product == null) {
             throw new IllegalArgumentException("상품을 찾을 수 없습니다. barcode=" + barcode);
         }
+        // 판매중지만 막는다 (발주중단은 남은 재고 판매용이라 허용, 상태 NULL 도 허용)
+        if (product.isDiscontinued()) {
+            throw new IllegalArgumentException("판매중지 상품입니다. barcode=" + barcode);
+        }
 
         return product;
     }

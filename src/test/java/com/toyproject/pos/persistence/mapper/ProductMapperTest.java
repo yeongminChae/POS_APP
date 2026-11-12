@@ -27,6 +27,7 @@ class ProductMapperTest {
         assertThat(product.getPrice()).isEqualByComparingTo(new BigDecimal("1500"));
         assertThat(product.getBrandId()).isEqualTo("1");
         assertThat(product.getCategoryId()).isEqualTo("1");
+        assertThat(product.getProductStatus()).isEqualTo("normal");
     }
 
     @Test
