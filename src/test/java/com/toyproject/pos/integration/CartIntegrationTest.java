@@ -137,30 +137,32 @@ class CartIntegrationTest extends PosApiTestSupport {
     // ===== 거래 키 =====
 
     @Test
-    @DisplayName("[현재 동작/버그] 같은 tranNo 를 다른 posNo 에서 쓰면 장바구니가 섞이고, 결제는 먼저 만든 POS 번호로 저장된다")
-    void sameTranNo_differentPos_sharesCart() throws Exception {
+    @DisplayName("같은 tranNo 라도 posNo 가 다르면 장바구니가 분리되고, 결제는 요청한 POS 번호로 저장된다")
+    void sameTranNo_differentPos_isolated() throws Exception {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
         addItem(POS_2, tranNo, CHOCO);
 
         JsonNode pos2Cart = json(getCart(POS_2, tranNo));
-        assertThat(pos2Cart.get("posNo").asText()).isEqualTo(POS_1); // POS 02 로 조회했는데 01 카트
+        assertThat(pos2Cart.get("posNo").asText()).isEqualTo(POS_2);
         assertThat(pos2Cart.get("linesList"))
                 .extracting(l -> l.get("barcode").asText())
-                .containsExactly(CHIPS, CHOCO);
+                .containsExactly(CHOCO);
 
         JsonNode sale = json(checkoutCash(POS_2, tranNo, 5000));
-        assertThat(sale.get("posNo").asText()).isEqualTo(POS_1);
-        assertThat(countSales(POS_1, tranNo)).isEqualTo(1);
-        assertThat(countSales(POS_2, tranNo)).isZero();
+        assertThat(sale.get("posNo").asText()).isEqualTo(POS_2);
+        assertThat(countSales(POS_2, tranNo)).isEqualTo(1);
+        assertThat(countSales(POS_1, tranNo)).isZero();
 
-        // POS 01 의 장바구니도 함께 비워짐
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
+        // POS 01 의 장바구니는 그대로 남음
+        assertThat(json(getCart(POS_1, tranNo)).get("linesList"))
+                .extracting(l -> l.get("barcode").asText())
+                .containsExactly(CHIPS);
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 같은 tranNo 를 다른 점포(strCd)에서 써도 장바구니가 섞인다")
-    void sameTranNo_differentStore_sharesCart() throws Exception {
+    @DisplayName("같은 tranNo·posNo 라도 점포(strCd)가 다르면 장바구니가 분리된다")
+    void sameTranNo_differentStore_isolated() throws Exception {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
 
@@ -169,6 +171,8 @@ class CartIntegrationTest extends PosApiTestSupport {
 
         JsonNode cart = json(getCart(POS_1, tranNo));
         assertThat(cart.get("strCd").asText()).isEqualTo(STORE);
-        assertThat(cart.get("linesList")).hasSize(2);
+        assertThat(cart.get("linesList"))
+                .extracting(l -> l.get("barcode").asText())
+                .containsExactly(CHIPS);
     }
 }

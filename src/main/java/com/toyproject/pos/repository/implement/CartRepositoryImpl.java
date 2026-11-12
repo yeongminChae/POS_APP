@@ -15,13 +15,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CartRepositoryImpl implements CartRepository {
 
-    private final Map<String, Cart> cartStore = new LinkedHashMap<>(); // 순서 고려 하기 위해 LinkedHashMap 사용
+    // 키: 점포·POS·거래번호 (CartKey)
+    private final Map<CartKey, Cart> cartStore = new LinkedHashMap<>(); // 순서 고려 하기 위해 LinkedHashMap 사용
 
     // 현재 저장 된, 카트 모델 조회
     @Override
     public Cart getCurrentCart(CartKey cartKey) {
         // cartStore 에서 있으면 기존 카트 모델 반환, 없으면 LinkedHashMap 생성 후 반환
-        return cartStore.computeIfAbsent(cartKey.getTranNo(), key ->
+        return cartStore.computeIfAbsent(cartKey, key ->
                 Cart.of(cartKey, new LinkedHashMap<>())
         );
 
@@ -30,7 +31,7 @@ public class CartRepositoryImpl implements CartRepository {
     // 카트 모델 + 카트 아이디 가지고 임시 저장소 맵 생성 및 추가
     @Override
     public void addOrIncrease(CartKey cartKey, CartLine item) {
-        cartStore.compute(cartKey.getTranNo(), (key, cart) -> {
+        cartStore.compute(cartKey, (key, cart) -> {
             if (cart == null)
                 cart = Cart.of(cartKey, new LinkedHashMap<>());
             cart.addOrIncrease(item);
@@ -54,7 +55,7 @@ public class CartRepositoryImpl implements CartRepository {
 
     @Override
     public void clearCartStore(Sale sale) {
-        cartStore.remove(sale.getTranNo());
+        cartStore.remove(CartKey.of(sale.getStoreCd(), sale.getPosNo(), sale.getTranNo()));
 
     }
 
