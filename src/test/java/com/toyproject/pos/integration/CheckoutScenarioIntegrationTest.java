@@ -9,6 +9,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
  * 거래 시작 → 상품 담기 → 수량 변경 → 상품 취소 → 현금 결제 → 거래 조회 → 반품
@@ -242,15 +243,32 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작] 반품 요청의 reason 은 무시되고 '개인사유'로 고정된다 (TR_JSON 기준)")
-    void refundReason_isIgnored() throws Exception {
+    @DisplayName("반품 요청의 reason 이 그대로 저장된다 (TR_JSON 기준)")
+    void refundReason_isSaved() throws Exception {
         String tranNo = paidSale(CHIPS);
         String refundTranNo = newTranNo();
         refund(POS_1, refundTranNo, POS_1, tranNo); // reason = "테스트 반품"
 
-        String trJson = jdbc.queryForObject(
-                "SELECT TR_JSON FROM RECEIPT_JOURNAL WHERE SALE_ID = ?", String.class, saleId(POS_1, refundTranNo));
-        assertThat(objectMapper.readTree(trJson).at("/refundDetail/reason").asText()).isEqualTo("개인사유");
+        assertThat(refundTrJson(refundTranNo).at("/refundDetail/reason").asText()).isEqualTo("테스트 반품");
+    }
+
+    @Test
+    @DisplayName("반품 요청에 reason 이 없으면 null 로 저장된다")
+    void refundWithoutReason_isNull() throws Exception {
+        String tranNo = paidSale(CHIPS);
+        String refundTranNo = newTranNo();
+        Map<String, Object> body = key(POS_1, refundTranNo);
+        body.put("origStrCd", STORE);
+        body.put("origPosNo", POS_1);
+        body.put("origTranNo", tranNo);
+        perform(post("/api/checkout/transaction/refund"), body);
+
+        assertThat(refundTrJson(refundTranNo).at("/refundDetail/reason").isNull()).isTrue();
+    }
+
+    private JsonNode refundTrJson(String refundTranNo) throws Exception {
+        return objectMapper.readTree(jdbc.queryForObject(
+                "SELECT TR_JSON FROM RECEIPT_JOURNAL WHERE SALE_ID = ?", String.class, saleId(POS_1, refundTranNo)));
     }
 
     @Test

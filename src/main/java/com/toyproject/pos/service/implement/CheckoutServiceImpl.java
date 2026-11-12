@@ -92,7 +92,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // 반품 거래 생성 및 DB에 저장
         Sale refundSale = Sale.refundedOf(
-                refundCartSummary, refundPayment, RefundDetail.of(sale));
+                refundCartSummary, refundPayment, RefundDetail.of(sale, refundReqDto.getReason()));
 
         checkoutRepository.save(refundSale);
         applyStock(refundSale);

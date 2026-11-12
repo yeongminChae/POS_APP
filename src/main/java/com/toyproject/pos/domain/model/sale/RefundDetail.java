@@ -23,12 +23,13 @@ public class RefundDetail {
                 .build();
     }
 
-    public static RefundDetail of(Sale sale) {
+    // reason: 반품 요청의 사유 (선택, 없으면 null)
+    public static RefundDetail of(Sale sale, String reason) {
         return RefundDetail.builder()
                 .origSaleId(sale.getSaleId())
                 .origReceiptNo(sale.getReceiptNo())
                 .refundedAt(DateFormatUtil.nowDate(ZoneId.systemDefault()))
-                .reason("개인사유")
+                .reason(reason)
                 .build();
     }
 
