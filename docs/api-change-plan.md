@@ -206,7 +206,7 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
   - `Cart.updateQty_withoutQtyField_throwsNpe` → `updateQty_withoutQty_returns400`
   - `Cart.updateQty_rejectedCases`: qty 0·−1은 `false` → 400. 없는 라인·취소된 라인은 A3 전까지 `false` 유지
   - 신규: 키 누락(`tranNo` 없음) → 400, 바코드 공백 → 400, 반품 원거래 키 누락 → 400, 일괄 등록에서 한 건만 바코드 누락 → 400 + 아무것도 안 담김
-- ⚠️ 사전 확인 X1 (4장): `@Validated` 컨트롤러의 `List<@Valid ...>`가 Spring 6.2에서 어떤 예외(`HandlerMethodValidationException` / `ConstraintViolationException`)로 오는지, `@JsonUnwrapped` 필드 검증이 동작하는지
+- 사전 확인 X1 결과(8장): 단건은 `MethodArgumentNotValidException`, 목록은 `ConstraintViolationException`. `@JsonUnwrapped` 안쪽 제약은 실행되지만 필드 이름이 `cartInfoReqDto.tranNo`로 나오므로 처리기에서 `tranNo`로 정규화. 메시지는 한국어로 지정
 - 영향 파일: `domain/dto/**/request/*.java`, 신규 `UpdateQtyReqDto`, 삭제 `UpdateQtyRequest`, `controller/*.java`, `GlobalExceptionHandler`, `service`(수량 변경 시그니처), `CartIntegrationTest`, `PosApiTestSupport.updateQty`
 - 위험도: 중
 
@@ -241,7 +241,7 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 
 **`feat(api): 조회 API를 쿼리 파라미터 방식으로 변경`**
 - `GET /api/cart/item`, `GET /api/checkout/transaction/call`: `@RequestBody CartInfoReqDto` → `@ModelAttribute @Valid CartInfoReqDto` (쿼리 `strCd`·`posNo`·`tranNo`)
-  - `CartInfoReqDto`는 final 필드 + 생성자라 Spring 6의 생성자 바인딩으로 받을 수 있음 — X2에서 확인
+  - `CartInfoReqDto`는 final 필드 + 생성자라 Spring 6의 생성자 바인딩으로 받을 수 있음 — X2에서 확인됨 (누락 시 `MethodArgumentNotValidException`)
 - 요약 API (A2): `GET /api/checkout/{posNo}/{tranNo}/summary` → `GET /api/checkout/summary?strCd=&posNo=&tranNo=` (Q6). 서비스 `getSaleSummary(PaymentReqDto)` → `getSaleSummary(CartKey)`
   - **바뀌는 테스트**: `PosApiTestSupport.getCart`·`callTransaction` 헬퍼 2개 (호출부 18곳·5곳은 그대로), `CheckoutEdge.summary_ignoresPathVariables` → `summary_usesQueryParameters`, 신규: 쿼리 파라미터 누락 → 400
 - 영향 파일: `controller/*.java`, `service/*/CheckoutService*.java`, `PosApiTestSupport`, `CheckoutEdgeIntegrationTest`
@@ -308,4 +308,31 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 
 ## 8. 사전 확인 기록
 
-(X1~X3 결과를 여기에 기록)
+`2e59437` 기준, 임시 테스트(`src/test/java/.../experiment/`, 실제 DTO와 같은 모양 — final 필드 + 전체 인자 생성자 + `@JsonUnwrapped` — 의 테스트 전용 컨트롤러·`ResponseEntityExceptionHandler` 상속 처리기)로 확인한 뒤 삭제했다 (커밋하지 않음). `@SpringBootTest` + MockMvc, 실제 앱과 같은 `@Validated` 컨트롤러.
+
+| 확인 | 요청 | 결과 |
+|---|---|---|
+| X1 단건 바디 | 정상 | 200, `@JsonUnwrapped` 키도 정상 바인딩 |
+| | `@JsonUnwrapped` 안쪽 `tranNo` 누락 | **400 `MethodArgumentNotValidException`** — 안쪽 제약도 실행됨. 단 필드 이름이 **`key.tranNo`**(자바 필드 경로)로 나옴 |
+| | `barcode` 누락 | 400 `MethodArgumentNotValidException`, 필드 `barcode` |
+| | 깨진 JSON | 400 `HttpMessageNotReadableException` |
+| X1 목록 바디 (`List<@Valid ...>`, `@NotEmpty`) | 한 건 `barcode` 누락 | **400 `ConstraintViolationException`** (`HandlerMethodValidationException` 아님 — 클래스의 `@Validated`가 AOP 메서드 검증을 먼저 함). 경로 `many.reqs[1].barcode` |
+| | 한 건 `tranNo` 누락 | 같은 예외, 경로 `many.reqs[1].key.tranNo` |
+| | 빈 목록 | 같은 예외, 경로 `many.reqs` |
+| X2 `@ModelAttribute` (쿼리 파라미터) | 정상 | 200, final 필드 + 생성자 DTO에 **생성자 바인딩 동작** |
+| | `tranNo` 누락 | 400 `MethodArgumentNotValidException`, 필드 `tranNo` |
+| X3 `ProblemDetail.setProperty("code", …)` | 업무 예외 | 409, `application/problem+json`, **`code`가 최상위 키**로 나옴 |
+
+추가로 확인된 점
+- 기본 검증 메시지가 영어(`must not be blank`)다 → 제약마다 `message = "..."`로 한국어 메시지를 지정한다
+- 기본 `detail`도 영어(`Invalid request content.`, `Failed to read request`)다 → 처리기에서 한국어로 덮어쓴다
+
+### 결과로 바뀐 계획 (A4·A6)
+
+| 항목 | 변경 |
+|---|---|
+| A4 처리기 | `MethodArgumentNotValidException`(단건 바디·쿼리)과 **`jakarta.validation.ConstraintViolationException`(목록 바디)** 둘 다 400 `VALIDATION_FAILED`로 매핑. `HttpMessageNotReadableException` → 400 `MALFORMED_REQUEST` |
+| A6 `errors[].field` | **JSON 필드 이름으로 정규화**: `@JsonUnwrapped` 필드 접두사(`cartInfoReqDto.`) 제거, 목록은 메서드·파라미터 접두사(`addToCart.productReqDtoList`) 제거 후 `[1].barcode` 형태 |
+| A6 메시지 | 모든 제약에 한국어 `message` 지정 (예: `@NotBlank(message = "거래번호는 필수입니다")`) |
+| A1·A2 | 계획대로 `@ModelAttribute @Valid CartInfoReqDto` 사용 (대안 `@RequestParam` 불필요) |
+| X3 | 테스트는 `jsonPath("$.code")`로 검사 (계획대로) |
