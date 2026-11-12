@@ -313,6 +313,8 @@ R1 ~ R12 (아래 4장)
 
 버그 수정 단계: [bugfix-plan.md](bugfix-plan.md) 참고
 
+API 변경 단계: [api-change-plan.md](api-change-plan.md) 참고
+
 ### 배치 2 (R7 → R6 → R8 → R5) 계획 수정 사항 / 메모
 
 - **R7**: 신규 유틸 위치는 `common/util/DateFormatUtil.java`(새 패키지). 메서드는 `nowDate(ZoneId)`(yyyyMMdd), `nowDateTime(ZoneId)`(yyyy-MM-dd HH:mm:ss). 타임존은 호출부 3곳(`Sale`, `RefundDetail`: systemDefault / `CommonPaymentData`: Asia/Seoul)에 인자로 남아 있음 → B15는 이 3곳의 인자만 바꾸면 됨.
