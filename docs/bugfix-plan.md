@@ -603,6 +603,34 @@ flowchart LR
 - **CLAUDE.md 갱신** (docs 커밋에 포함): 장바구니 저장소 설명(`LinkedHashMap<tranNo, Cart>` → `ConcurrentHashMap<CartKey, Cart>`), 조회·반품 흐름(복원·원거래 상태·음수 금액), 카드 결제 설명
 - 계획에 없는 테스트 기대값 변경: **없음**
 
+| 순서 | 항목 | 커밋 | 비고 |
+|---|---|---|---|
+| 12 | B12a 재고 차감·복원 | `432bf07` | `checkout_doesNotDecreaseStock` → `checkout_decreasesStock`, 신규 `checkout_skipsCancelledLines`·`refund_restoresStock`·`failedCheckout_doesNotDecreaseStock`, `discontinuedProduct_isSellable` 재고 0 → −1, 동시성 테스트에 재고 단언 |
+| 13 | B12b 판매중지 거절 | `2b61a0a` | `discontinuedProduct_isSellable` → `discontinuedProduct_isRejected`, 신규 `suspendOrderAndNullStatus_areSellable` |
+| 14 | B10 예외 전파 | `2e364ee` | 신규 단위 테스트 `CartServiceImplTest` (4개) |
+| 15 | T2 조회 트랜잭션 | — | 보류 (8장) |
+
+### 배치 4 메모
+
+- 테스트: 35개 → **43개**(스킵 0). 늘어난 8개: `checkout_skipsCancelledLines`, `refund_restoresStock`, `failedCheckout_doesNotDecreaseStock`, `suspendOrderAndNullStatus_areSellable`, `CartServiceImplTest` 4개
+- 실패 테스트가 빨간 이유
+  - B12a: 결제·반품 후 재고가 그대로 (예: 쿠키 4개 결제 후 기대 26, 실제 30)
+  - B12b: 판매중지 상품 담기가 바디 status 200
+  - B10: DB 오류(`DataAccessResourceFailureException`)에서 예외가 나지 않고 `false`
+  - **처음부터 초록이었던 보호 테스트** (의도함): `failedCheckout_doesNotDecreaseStock`(지금까지는 차감 자체가 없었으므로), `suspendOrderAndNullStatus_areSellable`(지금까지는 상태를 보지 않았으므로), `CartServiceImplTest`의 미등록·판매중지·정상 3개(기존 동작 유지 확인)
+  - 동시성 테스트의 재고 단언은 수정과 같은 단계에서 추가해서 빨간 상태를 따로 확인하지 않았다 (수정 전이라면 감자칩 재고가 줄지 않아 실패했을 단언). 수정 후 3회 반복 통과
+- **B12a 구현**
+  - 기존 `ProductMapper.updateProductStock(productId, qty)`(호출부 없음)를 바코드 기준 `decreaseStockByBarcode(barcode, qty)`로 **바꿨다** (반품 복원 라인에는 `productId`가 없음). `ProductService.updateStock` → `decreaseStock(barcode, qty)`, 갱신 행이 1이 아니면 `IllegalStateException("재고 정보가 없습니다...")` (8장 E4: 운영에는 재고 행 없는 상품 0건)
+  - `CheckoutServiceImpl.applyStock(sale)`을 결제·반품 모두 `save` 다음에 호출. NORMAL·REFUNDED 라인만 반영 (REFUNDED는 수량이 음수라 같은 `STOCK - qty`로 복원), CANCELLED 제외
+  - `CartServiceImpl.addItem`의 주석 처리된 재고 갱신 코드 삭제 (담을 때 차감하지 않음)
+  - 시드 재고가 작아서(감자칩 10) 테스트를 돌리면 재고가 음수가 된다 — 음수 허용 정책(Q4)대로라 문제없음. 재고 단언은 모두 "테스트 시작 시점 대비 변화량"으로 검사
+- **B12b 구현**: `findByBarcode`에 `PRODUCT_STATUS` 추가 → `ProductQueryDto.productStatus`·`isDiscontinued()`. `discontinued`만 거절, `suspend_order`·NULL 허용. 응답은 Q3대로 기존 404 바디(`"미등록 상품"`) — 메시지 분리는 A4
+- **계획과 달라진 점 (B10 예외 이름)**: 계획은 `ProductNotFoundException`이었지만, 판매중지(B12b)도 같은 경로로 `false`가 되어야 해서 둘을 묶는 `ProductNotSellableException`으로 정했다. B12b에서 임시로 쓴 `IllegalArgumentException`도 이 예외로 바뀜
+- **B10 부수 효과**: 일괄 등록(`addItems`)에서 DB 오류가 나면 루프 중간에 예외로 중단된다 (나머지 상품은 담기지 않음). 배치 3의 N5처럼 저장소가 깨지는 상황도 이제 "미등록 상품"이 아니라 500으로 드러난다
+- **⚠️ 시연 전 확인**: 운영 상품의 29%(35,282건)가 `discontinued`라 이제 담을 수 없다 (8장 E4). 시연용 바코드의 `PRODUCT_STATUS`를 확인할 것
+- **CLAUDE.md 갱신** (docs 커밋에 포함): 결제 흐름에 재고 반영 단계, 상품 담기 예외 정책, "재고 차감 미구현" 항목 삭제
+- 계획에 없는 테스트 기대값 변경: **없음**
+
 ## 8. 실험 기록
 
 실험은 `e425ae0` 기준으로 임시 테스트 클래스(`src/test/java/.../experiment/`)를 만들어 실행했고, 끝난 뒤 삭제했다 (커밋하지 않음). 운영 DB 조회는 `sqlite3 -readonly`(`mode=ro`)로만 했다.
