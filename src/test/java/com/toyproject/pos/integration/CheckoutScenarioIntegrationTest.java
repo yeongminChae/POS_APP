@@ -143,22 +143,36 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
                 "SELECT TR_JSON FROM RECEIPT_JOURNAL WHERE SALE_ID = ?", String.class, refundSaleId));
         assertThat(refundTrJson.get("saleId").asLong()).isEqualTo(refundSaleId);
 
-        // [현재 동작/버그] 원거래 상태는 NORMAL 그대로 (반품 여부가 원거래에 표시되지 않음)
-        assertThat(saleRow(POS_1, tranNo).get("SALE_STATUS")).isEqualTo("NORMAL");
+        // 반품되면 원거래 상태도 REFUNDED
+        assertThat(saleRow(POS_1, tranNo).get("SALE_STATUS")).isEqualTo("REFUNDED");
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 같은 원거래를 두 번 반품할 수 있다")
-    void refundTwice_isAllowed() throws Exception {
+    @DisplayName("같은 원거래를 두 번 반품하면 IllegalStateException(500), 두 번째 반품은 저장되지 않는다")
+    void refundTwice_isRejected() throws Exception {
         String tranNo = paidSale(CHIPS);
 
         refund(POS_1, newTranNo(), POS_1, tranNo);
         String secondRefund = newTranNo();
-        JsonNode second = json(refund(POS_1, secondRefund, POS_1, tranNo));
 
-        assertThat(second.get("saleStatus").asText()).isEqualTo("REFUNDED");
+        assertThatThrownBy(() -> refund(POS_1, secondRefund, POS_1, tranNo))
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("이미 반품된 거래입니다.");
+        assertThat(countSales(POS_1, secondRefund)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM SALES WHERE ORIG_SALE_ID = ?", Integer.class,
-                saleId(POS_1, tranNo))).isEqualTo(2);
+                saleId(POS_1, tranNo))).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("반품 거래(REFUNDED)를 다시 반품할 수 없다")
+    void refundOfRefund_isRejected() throws Exception {
+        String tranNo = paidSale(CHIPS);
+        String refundTranNo = newTranNo();
+        refund(POS_1, refundTranNo, POS_1, tranNo);
+
+        assertThatThrownBy(() -> refund(POS_1, newTranNo(), POS_1, refundTranNo))
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("이미 반품된 거래입니다.");
     }
 
     @Test
@@ -239,6 +253,7 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
         assertThat(countSales(POS_1, refundTranNo)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM SALES WHERE ORIG_SALE_ID = ?", Integer.class,
                 saleId(POS_1, tranNo))).isZero();
+        assertThat(saleRow(POS_1, tranNo).get("SALE_STATUS")).isEqualTo("NORMAL"); // 원거래 상태 변경도 롤백
     }
 
     /** 단일 상품을 현금 결제까지 끝낸 거래번호를 반환 */

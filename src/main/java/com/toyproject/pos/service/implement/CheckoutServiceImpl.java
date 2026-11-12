@@ -72,6 +72,10 @@ public class CheckoutServiceImpl implements CheckoutService {
         Cart refundedCart = origin.cart();
         Sale sale = origin.sale();
 
+        // 원거래 상태를 먼저 바꿔서 중복 반품을 막음 (조건부 UPDATE 한 번이라 동시 요청에도 1건만 성공)
+        if (!checkoutRepository.markRefunded(sale.getSaleId()))
+            throw new IllegalStateException("이미 반품된 거래입니다.");
+
         // 기존 거래 반품 거래로 상태 변경
         refundedCart.refundAll();
 

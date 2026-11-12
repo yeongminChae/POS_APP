@@ -157,6 +157,16 @@
                 #{bodyText})
     </insert>
 
+    <!-- ======================== UPDATES ======================== -->
+
+    <!-- 원거래 반품 처리: 정상(NORMAL) 거래일 때만 REFUNDED 로 변경 (영향 행 0 = 이미 반품됨) -->
+    <update id="markSaleRefunded">
+        UPDATE SALES
+        SET SALE_STATUS = 'REFUNDED'
+        WHERE SALE_ID = #{saleId}
+          AND SALE_STATUS = 'NORMAL'
+    </update>
+
     <!-- ======================== SELECTS ======================== -->
 
     <select id="selectSaleByTranInfo" resultMap="SaleRowMap">

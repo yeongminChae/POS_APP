@@ -69,6 +69,55 @@ class ConcurrentPosIntegrationTest extends PosApiTestSupport {
         }
     }
 
+    @Test
+    @DisplayName("POS 2대가 같은 원거래를 동시에 반품하면 정확히 1건만 성공한다")
+    void sameOriginal_refundedConcurrently_onlyOnce() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            for (int i = 0; i < ROUNDS; i++) {
+                String original = newTranNo();
+                addItem(POS_1, original, CHIPS);
+                checkoutCash(POS_1, original, 2000);
+                String refund1 = newTranNo();
+                String refund2 = newTranNo();
+
+                CountDownLatch start = new CountDownLatch(1);
+                Future<Throwable> a = pool.submit(awaiting(start, () -> failureOf(() -> refund(POS_1, refund1, POS_1, original))));
+                Future<Throwable> b = pool.submit(awaiting(start, () -> failureOf(() -> refund(POS_2, refund2, POS_1, original))));
+                start.countDown();
+
+                List<Throwable> failures = new ArrayList<>();
+                for (Future<Throwable> f : List.of(a, b)) {
+                    Throwable t = f.get(30, TimeUnit.SECONDS);
+                    if (t != null) failures.add(t);
+                }
+
+                assertThat(failures).hasSize(1);
+                assertThat(rootCause(failures.get(0)))
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessage("이미 반품된 거래입니다.");
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM SALES WHERE ORIG_SALE_ID = ?", Integer.class,
+                        saleId(POS_1, original))).isEqualTo(1);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static Throwable failureOf(Callable<?> call) {
+        try {
+            call.call();
+            return null;
+        } catch (Throwable t) {
+            return t;
+        }
+    }
+
+    private static Throwable rootCause(Throwable t) {
+        while (t.getCause() != null && t.getCause() != t) t = t.getCause();
+        return t;
+    }
+
     /** 결제 1건과 현금 상세 1건이 같은 PAYMENT_ID 로 연결되어 있는지 */
     private void assertCashDetailMatches(long saleId, String amountReceived) {
         List<Map<String, Object>> rows = jdbc.queryForList(

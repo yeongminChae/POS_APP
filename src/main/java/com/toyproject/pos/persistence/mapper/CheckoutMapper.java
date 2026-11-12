@@ -19,6 +19,9 @@ public interface CheckoutMapper {
 
     int insertJournalData(JournalDataRow journal);
 
+    // UPDATEs
+    int markSaleRefunded(@Param("saleId") Long saleId); // NORMAL 일 때만 갱신, 영향 행 수 반환
+
     // SELECTs (constructor resultMap 사용)
     SaleRow selectSaleByTranInfo(@Param("storeCd") String storeCd,
                                  @Param("posNo") String posNo,

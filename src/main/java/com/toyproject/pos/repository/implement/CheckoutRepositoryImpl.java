@@ -61,6 +61,11 @@ public class CheckoutRepositoryImpl implements CheckoutRepository {
     }
 
     @Override
+    public boolean markRefunded(Long saleId) {
+        return checkoutMapper.markSaleRefunded(saleId) == 1;
+    }
+
+    @Override
     public Sale getTransaction(CartKey cartKey, CartSummary cartSummary, Payment payment) {
 
         SaleRow saleRow = getSaleRow(cartKey);

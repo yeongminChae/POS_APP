@@ -10,6 +10,9 @@ public interface CheckoutRepository {
 
     Long save(Sale sale);
 
+    // 원거래를 반품 상태로 변경. 정상 거래가 아니면(이미 반품됨) false
+    boolean markRefunded(Long saleId);
+
     Sale getTransaction(CartKey cartKey, CartSummary cartSummary, Payment payment);
 
     Cart getCart(CartKey cartKey);
