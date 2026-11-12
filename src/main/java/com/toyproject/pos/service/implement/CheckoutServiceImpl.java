@@ -1,5 +1,6 @@
 package com.toyproject.pos.service.implement;
 
+import com.toyproject.pos.common.exception.TransactionNotFoundException;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.payment.request.PaymentReqDto;
 import com.toyproject.pos.domain.dto.payment.request.RefundReqDto;
@@ -96,6 +97,9 @@ public class CheckoutServiceImpl implements CheckoutService {
 
     // DB에 저장된 거래를 카트·결제·판매 순으로 복원 (조회·반품 공통)
     private StoredTransaction loadTransaction(CartKey cartKey) {
+        if (!checkoutRepository.existsTransaction(cartKey))
+            throw new TransactionNotFoundException(cartKey);
+
         Cart cart = checkoutRepository.getCart(cartKey);
         Payment payment = checkoutRepository.getPayment(cartKey);
         Sale sale = checkoutRepository.getTransaction(cartKey, CartSummary.of(cart), payment);
@@ -131,10 +135,10 @@ public class CheckoutServiceImpl implements CheckoutService {
                 );
 
             case CARD:
-                break;
+                throw new UnsupportedOperationException("CARD 결제는 아직 미지원");
         }
 
-        return null;
+        throw new UnsupportedOperationException("지원하지 않는 결제 수단: " + paymentReq.getPaymentMethod());
 
     }
 

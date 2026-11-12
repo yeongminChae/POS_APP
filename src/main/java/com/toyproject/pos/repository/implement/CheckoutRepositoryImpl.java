@@ -74,6 +74,11 @@ public class CheckoutRepositoryImpl implements CheckoutRepository {
     }
 
     @Override
+    public boolean existsTransaction(CartKey cartKey) {
+        return getSaleRow(cartKey) != null;
+    }
+
+    @Override
     public Cart getCart(CartKey cartKey) {
 
         List<SaleLineRow> saleLineRows = checkoutMapper.selectSaleLinesBySaleKey(

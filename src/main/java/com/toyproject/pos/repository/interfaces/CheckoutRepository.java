@@ -15,6 +15,8 @@ public interface CheckoutRepository {
 
     Sale getTransaction(CartKey cartKey, CartSummary cartSummary, Payment payment);
 
+    boolean existsTransaction(CartKey cartKey);
+
     Cart getCart(CartKey cartKey);
 
     Payment getPayment(CartKey cartKey);

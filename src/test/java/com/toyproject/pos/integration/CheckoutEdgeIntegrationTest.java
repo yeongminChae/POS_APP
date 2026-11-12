@@ -1,6 +1,7 @@
 package com.toyproject.pos.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.toyproject.pos.common.exception.TransactionNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.sqlite.SQLiteException;
@@ -79,23 +80,33 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 카드 결제는 미구현 — Payment 가 null 이라 NPE(500), 저장 없음, 장바구니 유지")
-    void cardPayment_throwsNpe() throws Exception {
+    @DisplayName("카드 결제는 미구현 — UnsupportedOperationException(500), 저장 없음, 장바구니 유지")
+    void cardPayment_isUnsupported() throws Exception {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
 
         assertThatThrownBy(() -> perform(post("/api/checkout"), with(key(POS_1, tranNo), "paymentMethod", "CARD")))
-                .hasRootCauseInstanceOf(NullPointerException.class);
+                .hasRootCauseInstanceOf(UnsupportedOperationException.class);
 
         assertThat(countSales(POS_1, tranNo)).isZero();
         assertThat(json(getCart(POS_1, tranNo)).get("linesList")).hasSize(1);
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 존재하지 않는 거래 조회는 NPE(500)")
-    void callUnknownTransaction_throwsNpe() {
+    @DisplayName("존재하지 않는 거래 조회는 TransactionNotFoundException(500)")
+    void callUnknownTransaction_throwsNotFound() {
         assertThatThrownBy(() -> callTransaction(POS_1, "NO-SUCH-TRAN"))
-                .hasRootCauseInstanceOf(NullPointerException.class);
+                .hasRootCauseInstanceOf(TransactionNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 원거래 반품은 TransactionNotFoundException(500), 저장 없음")
+    void refundUnknownTransaction_throwsNotFound() {
+        String refundTranNo = newTranNo();
+
+        assertThatThrownBy(() -> refund(POS_1, refundTranNo, POS_1, "NO-SUCH-TRAN"))
+                .hasRootCauseInstanceOf(TransactionNotFoundException.class);
+        assertThat(countSales(POS_1, refundTranNo)).isZero();
     }
 
     @Test
