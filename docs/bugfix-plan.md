@@ -631,6 +631,31 @@ flowchart LR
 - **CLAUDE.md 갱신** (docs 커밋에 포함): 결제 흐름에 재고 반영 단계, 상품 담기 예외 정책, "재고 차감 미구현" 항목 삭제
 - 계획에 없는 테스트 기대값 변경: **없음**
 
+| 순서 | 항목 | 커밋 | 비고 |
+|---|---|---|---|
+| 16 | B14a 반품 사유 저장 | `7059f4f` | `refundReason_isIgnored` → `refundReason_isSaved`, 신규 `refundWithoutReason_isNull` |
+| 17 | B15 타임존 통일 | `6c3e630` | 신규 단위 테스트 `SaleTimeZoneTest` (2개) |
+| 18 | N4 `JournalDataRow` 죽은 필드 제거 | `9381c24` | refactor, 테스트 변경 없음 |
+
+### 배치 5 메모
+
+- 테스트: 43개 → **46개**(스킵 0). 늘어난 3개: `refundWithoutReason_isNull`, `SaleTimeZoneTest` 2개
+- 실패 테스트가 빨간 이유
+  - B14a: 저장된 사유가 `"개인사유"`(요청은 `"테스트 반품"`), 사유 없는 요청도 `"개인사유"`
+  - B15: JVM 기본 타임존을 UTC+14로 바꾸자(실행 시각 서울 21시 이후) 영수증·반품 일자가 `20261113`, 서울 날짜는 `20261112`
+- **B14a 구현**: `RefundDetail.of(sale, reason)`, 서비스가 `RefundReqDto.reason`을 넘김. 사유가 없으면 null (Q2)
+- **B15 구현**: `DateFormatUtil.POS_ZONE`(Asia/Seoul) 상수 하나를 `Sale`(영수증 날짜)·`RefundDetail`(반품 날짜)·`CommonPaymentData`(결제 시각)가 함께 사용. 코드에서 `ZoneId.systemDefault()` 사용처는 0개
+  - 테스트는 JVM 전체 기본 타임존을 바꾸므로 `@AfterEach`에서 원래 값으로 되돌린다
+- **N4**: `origSaleId`·`origReceiptNo` 필드와 미사용 import 2개(`SaleResDto`, `SaleStatus`) 제거. `insertJournalData`가 이 필드를 쓰지 않아 저장 결과는 같다 (전체 테스트 변경 없이 통과)
+- 계획에 없는 테스트 기대값 변경: **없음**
+
+### 버그 수정 단계 마무리
+
+- 처리 완료: B1~B10, B12a, B12b, B14a, B15, B16, N1~N5 (+ 동시성 전제 설정·테스트)
+- 보류 유지 (1.3절): B11(A4에서), B13(A6에서), B12c 성인 인증·B14b 계산원(API·인증 설계), B12d 재고 부족 차단(정책상 안 함), B17 enum ↔ CHECK(카드·취소 구현 때), T2 조회 트랜잭션(8장)
+- 남은 정리 후보 (refactor): 반품 흐름의 `withOriginSaleId` 중복 호출(배치 2 메모), L5 결제 수단별 저장 정책과 도달 불가 `case CARD`(카드 구현 때)
+- 다음 단계: API 변경 A1~A7 (architecture.md 5장 순서: A4 → A6 → A5 → A3 → A1·A2). B11·B13 보류분과 L2 빈 TODO가 여기에 포함된다
+
 ## 8. 실험 기록
 
 실험은 `e425ae0` 기준으로 임시 테스트 클래스(`src/test/java/.../experiment/`)를 만들어 실행했고, 끝난 뒤 삭제했다 (커밋하지 않음). 운영 DB 조회는 `sqlite3 -readonly`(`mode=ro`)로만 했다.
