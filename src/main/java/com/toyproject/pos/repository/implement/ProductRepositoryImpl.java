@@ -20,8 +20,8 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
-    public int updateProductStock(String productId, int updateQty) {
-        return productMapper.updateProductStock(productId, updateQty);
+    public int decreaseStockByBarcode(String barcode, int qty) {
+        return productMapper.decreaseStockByBarcode(barcode, qty);
     }
 
 }

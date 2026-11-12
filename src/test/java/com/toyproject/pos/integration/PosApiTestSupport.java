@@ -139,6 +139,10 @@ abstract class PosApiTestSupport {
         return ((Number) saleRow(posNo, tranNo).get("SALE_ID")).longValue();
     }
 
+    int stock(String productId) {
+        return jdbc.queryForObject("SELECT STOCK FROM INVENTORY WHERE PRODUCT_ID = ?", Integer.class, productId);
+    }
+
     int countSales(String posNo, String tranNo) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM SALES WHERE STORE_CD = ? AND POS_NO = ? AND TRAN_NO = ?",
                 Integer.class, STORE, posNo, tranNo);

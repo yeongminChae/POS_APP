@@ -176,6 +176,25 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
+    @DisplayName("반품하면 반품 수량만큼 재고가 복원된다 (취소 라인은 제외)")
+    void refund_restoresStock() throws Exception {
+        String tranNo = newTranNo();
+        int chipsBefore = stock("P001");
+        int chocoBefore = stock("P002");
+        addItem(POS_1, tranNo, CHIPS);
+        addItem(POS_1, tranNo, CHIPS);
+        addItem(POS_1, tranNo, CHOCO);
+        cancelItem(POS_1, tranNo, CHOCO);
+        checkoutCash(POS_1, tranNo, 5000);
+        assertThat(stock("P001")).isEqualTo(chipsBefore - 2);
+
+        refund(POS_1, newTranNo(), POS_1, tranNo);
+
+        assertThat(stock("P001")).isEqualTo(chipsBefore);
+        assertThat(stock("P002")).isEqualTo(chocoBefore);
+    }
+
+    @Test
     @DisplayName("반품 거래의 승인 시각과 결제 거래 키는 원거래가 아니라 반품 기준이다")
     void refund_hasOwnApprovedAtAndKey() throws Exception {
         String tranNo = paidSale(CHIPS);

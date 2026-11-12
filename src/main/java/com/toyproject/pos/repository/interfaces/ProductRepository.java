@@ -5,6 +5,6 @@ import com.toyproject.pos.domain.dto.product.ProductQueryDto;
 public interface ProductRepository {
     ProductQueryDto findByBarcode(String barcode);
 
-    int updateProductStock(String productId, int updateQty);
+    int decreaseStockByBarcode(String barcode, int qty);
 
 }

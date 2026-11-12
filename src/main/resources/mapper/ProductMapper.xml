@@ -18,12 +18,11 @@
         ;
     </select>
 
-    <!-- 상품 재고 반영 쿼리 -->
-    <update id="updateProductStock">
-        UPDATE inventory
-        SET stock = stock - #{qty}
-        WHERE 1 = 1
-          and PRODUCT_ID = #{productId}
+    <!-- 상품 재고 차감 (qty 가 음수면 복원). 반품 복원 라인에는 PRODUCT_ID 가 없어 바코드로 찾는다 -->
+    <update id="decreaseStockByBarcode">
+        UPDATE INVENTORY
+        SET STOCK = STOCK - #{qty}
+        WHERE PRODUCT_ID = (SELECT PRODUCT_ID FROM PRODUCT WHERE BARCODE = #{barcode})
     </update>
 
 </mapper>

@@ -5,6 +5,7 @@ import com.toyproject.pos.domain.dto.product.ProductQueryDto;
 public interface ProductService {
     ProductQueryDto findProduct(String barcode);
 
-    int updateStock(String productId, int updateQty);
+    // 재고 차감 (qty 가 음수면 복원). 재고 행이 없으면 IllegalStateException
+    void decreaseStock(String barcode, int qty);
 
 }

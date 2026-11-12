@@ -7,6 +7,8 @@ import com.toyproject.pos.domain.dto.payment.request.RefundReqDto;
 import com.toyproject.pos.domain.dto.sale.SaleResDto;
 import com.toyproject.pos.domain.model.cart.Cart;
 import com.toyproject.pos.domain.model.cart.CartKey;
+import com.toyproject.pos.domain.model.cart.CartLine;
+import com.toyproject.pos.domain.model.cart.ItemStatus;
 import com.toyproject.pos.domain.model.cart.CartSummary;
 import com.toyproject.pos.domain.model.payment.CashPayment;
 import com.toyproject.pos.domain.model.payment.CommonPaymentData;
@@ -16,6 +18,7 @@ import com.toyproject.pos.domain.model.sale.Sale;
 import com.toyproject.pos.repository.interfaces.CheckoutRepository;
 import com.toyproject.pos.service.interfaces.CartService;
 import com.toyproject.pos.service.interfaces.CheckoutService;
+import com.toyproject.pos.service.interfaces.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +32,7 @@ import java.math.BigDecimal;
 public class CheckoutServiceImpl implements CheckoutService {
 
     private final CartService cartService;
+    private final ProductService productService;
     private final CheckoutRepository checkoutRepository;
 
     @Override
@@ -44,6 +48,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // 생성 모델 DB 저장 (모델 -> Row 변환 후 저장)
         checkoutRepository.save(sale);
+        applyStock(sale);
 
         // 커밋 저장 후 저장소 초기화
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -90,9 +95,19 @@ public class CheckoutServiceImpl implements CheckoutService {
                 refundCartSummary, refundPayment, RefundDetail.of(sale));
 
         checkoutRepository.save(refundSale);
+        applyStock(refundSale);
         SaleResDto saleResDto = SaleResDto.of(refundSale);
 
         return saleResDto.withOriginSaleId(sale.getSaleId());
+    }
+
+    // 재고 반영: 정상 라인은 차감, 반품 라인은 수량이 음수라 같은 계산으로 복원, 취소 라인은 제외
+    // 결제·반품과 같은 트랜잭션이라 실패하면 함께 롤백됨
+    private void applyStock(Sale sale) {
+        for (CartLine line : sale.getCartSummary().getLines()) {
+            if (line.getItemStatus() == ItemStatus.NORMAL || line.getItemStatus() == ItemStatus.REFUNDED)
+                productService.decreaseStock(line.getBarcode(), line.getQty());
+        }
     }
 
     // DB에 저장된 거래를 카트·결제·판매 순으로 복원 (조회·반품 공통)

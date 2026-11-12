@@ -28,7 +28,7 @@ class CartIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 판매중지·재고 0 상품(…010)이 담기고 결제까지 된다, 재고 차감도 없다")
+    @DisplayName("[현재 동작/버그] 판매중지·재고 0 상품(…010)이 담기고 결제까지 된다 (재고는 음수로 차감)")
     void discontinuedProduct_isSellable() throws Exception {
         String tranNo = newTranNo();
 
@@ -36,22 +36,36 @@ class CartIntegrationTest extends PosApiTestSupport {
         JsonNode sale = json(checkoutCash(POS_1, tranNo, 5000));
 
         assertThat(sale.get("saleStatus").asText()).isEqualTo("NORMAL");
-        assertThat(jdbc.queryForObject("SELECT STOCK FROM INVENTORY WHERE PRODUCT_ID = 'P010'", Integer.class))
-                .isEqualTo(0); // 재고 0 그대로 (음수로도 안 감 = 차감 자체가 없음)
+        assertThat(stock("P010")).isEqualTo(-1); // 재고 부족이어도 판매는 막지 않고 음수 허용 (B12d 보류)
     }
 
     @Test
-    @DisplayName("[현재 동작] 결제해도 INVENTORY 재고는 차감되지 않는다")
-    void checkout_doesNotDecreaseStock() throws Exception {
+    @DisplayName("결제하면 정상 라인 수량만큼 INVENTORY 재고가 차감된다")
+    void checkout_decreasesStock() throws Exception {
         String tranNo = newTranNo();
-        Integer before = jdbc.queryForObject("SELECT STOCK FROM INVENTORY WHERE PRODUCT_ID = 'P003'", Integer.class);
+        int before = stock("P003");
 
         addItem(POS_1, tranNo, COOKIE);
         updateQty(POS_1, tranNo, COOKIE, 4);
         checkoutCash(POS_1, tranNo, 20000);
 
-        assertThat(jdbc.queryForObject("SELECT STOCK FROM INVENTORY WHERE PRODUCT_ID = 'P003'", Integer.class))
-                .isEqualTo(before);
+        assertThat(stock("P003")).isEqualTo(before - 4);
+    }
+
+    @Test
+    @DisplayName("취소한 라인은 재고를 차감하지 않는다")
+    void checkout_skipsCancelledLines() throws Exception {
+        String tranNo = newTranNo();
+        int chocoBefore = stock("P002");
+        int cookieBefore = stock("P003");
+
+        addItem(POS_1, tranNo, CHOCO);
+        cancelItem(POS_1, tranNo, CHOCO);
+        addItem(POS_1, tranNo, COOKIE);
+        checkoutCash(POS_1, tranNo, 5000);
+
+        assertThat(stock("P002")).isEqualTo(chocoBefore);
+        assertThat(stock("P003")).isEqualTo(cookieBefore - 1);
     }
 
     @Test

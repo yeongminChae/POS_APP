@@ -48,10 +48,7 @@ public class CartServiceImpl implements CartService {
             // 현재는 임시 저장소에 저장
             CartKey cartKey = productReqDto.getKey();
             cartRepository.addOrIncrease(cartKey, cartLine);
-
-            // 재고 수량 업데이트
-//            productService.updateStock(productDto.getProductId(),
-//                    cartRepository.getItemQty(tranNo, barcode));
+            // 재고는 담을 때가 아니라 결제·반품 시점에 반영 (CheckoutServiceImpl)
 
             return true;
 

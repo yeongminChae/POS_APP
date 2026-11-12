@@ -20,8 +20,10 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public int updateStock(String productId, int updateQty) {
-        return productRepository.updateProductStock(productId, updateQty);
+    public void decreaseStock(String barcode, int qty) {
+        // 재고 부족이어도 막지 않고 음수 허용 (실물 재고 판매 우선)
+        if (productRepository.decreaseStockByBarcode(barcode, qty) != 1)
+            throw new IllegalStateException("재고 정보가 없습니다. barcode=" + barcode);
     }
 
 }

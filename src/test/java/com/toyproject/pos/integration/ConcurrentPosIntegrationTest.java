@@ -34,6 +34,9 @@ class ConcurrentPosIntegrationTest extends PosApiTestSupport {
     @Test
     @DisplayName("POS 01 결제와 POS 02 반품을 동시에 실행해도 모두 성공하고 결제 상세가 올바른 결제에 붙는다")
     void checkoutAndRefund_concurrently() throws Exception {
+        int chipsBefore = stock("P001");
+        int cookieBefore = stock("P003");
+
         // 반품할 원거래를 라운드 수만큼 미리 만든다 (POS 02)
         List<String> originals = new ArrayList<>();
         for (int i = 0; i < ROUNDS; i++) {
@@ -68,6 +71,10 @@ class ConcurrentPosIntegrationTest extends PosApiTestSupport {
         } finally {
             pool.shutdownNow();
         }
+
+        // 동시 결제·반품 후 재고: 감자칩은 결제한 만큼 줄고, 쿠키는 결제 후 전부 반품되어 원래대로
+        assertThat(stock("P001")).isEqualTo(chipsBefore - ROUNDS);
+        assertThat(stock("P003")).isEqualTo(cookieBefore);
     }
 
     @Test

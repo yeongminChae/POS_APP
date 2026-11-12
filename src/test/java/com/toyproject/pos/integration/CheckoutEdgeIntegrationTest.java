@@ -128,6 +128,20 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
+    @DisplayName("결제가 실패해 롤백되면 재고도 차감되지 않는다")
+    void failedCheckout_doesNotDecreaseStock() throws Exception {
+        String tranNo = newTranNo();
+        addItem(POS_1, tranNo, CHIPS);
+        checkoutCash(POS_1, tranNo, 2000);
+        int afterFirst = stock("P001");
+
+        addItem(POS_1, tranNo, CHIPS); // 같은 tranNo 재사용 → 저장 단계에서 UNIQUE 위반
+        assertThatThrownBy(() -> checkoutCash(POS_1, tranNo, 2000)).isInstanceOf(Exception.class);
+
+        assertThat(stock("P001")).isEqualTo(afterFirst);
+    }
+
+    @Test
     @DisplayName("[현재 동작] 결제 요약 API 는 경로의 posNo/tranNo 를 무시하고 바디의 키를 쓴다")
     void summary_ignoresPathVariables() throws Exception {
         String tranNo = newTranNo();
