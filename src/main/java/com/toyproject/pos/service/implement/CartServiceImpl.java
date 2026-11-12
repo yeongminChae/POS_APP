@@ -1,6 +1,7 @@
 package com.toyproject.pos.service.implement;
 
 
+import com.toyproject.pos.common.exception.ProductNotSellableException;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.product.ProductQueryDto;
 import com.toyproject.pos.domain.dto.product.request.ProductReqDto;
@@ -52,9 +53,8 @@ public class CartServiceImpl implements CartService {
 
             return true;
 
-        } catch (Exception ex) {
-            ex.toString();
-
+        } catch (ProductNotSellableException ex) {
+            // 미등록·판매중지만 false. DB 오류 등 나머지 예외는 그대로 전파 (장애를 "미등록 상품"으로 숨기지 않음)
             return false;
 
         }
@@ -99,11 +99,11 @@ public class CartServiceImpl implements CartService {
     private ProductQueryDto getProduct(String barcode) {
         ProductQueryDto product = productService.findProduct(barcode);
         if (product == null) {
-            throw new IllegalArgumentException("상품을 찾을 수 없습니다. barcode=" + barcode);
+            throw new ProductNotSellableException("상품을 찾을 수 없습니다. barcode=" + barcode);
         }
         // 판매중지만 막는다 (발주중단은 남은 재고 판매용이라 허용, 상태 NULL 도 허용)
         if (product.isDiscontinued()) {
-            throw new IllegalArgumentException("판매중지 상품입니다. barcode=" + barcode);
+            throw new ProductNotSellableException("판매중지 상품입니다. barcode=" + barcode);
         }
 
         return product;
