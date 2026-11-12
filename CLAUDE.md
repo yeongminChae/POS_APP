@@ -53,17 +53,17 @@ POS_DB_URL="jdbc:sqlite:/절대/경로/PRODUCT_MST" ./gradlew bootRun
 거래는 `CartKey(strCd, posNo, tranNo)`로 식별. 대부분의 요청 DTO가 `CartInfoReqDto`를 포함하고 `getKey()`로 `CartKey`를 꺼냄.
 
 ### 장바구니 (DB에 없음)
-`CartRepositoryImpl`은 **인메모리 `LinkedHashMap<tranNo, Cart>`** 임시 저장소다 (추후 DB 이전 예정). 서버 재시작 시 장바구니가 사라지고, 키가 `tranNo`만 사용됨에 유의. 상품 정보만 `ProductMapper`로 DB(`PRODUCT`)에서 조회.
+`CartRepositoryImpl`은 **인메모리 `ConcurrentHashMap<CartKey, Cart>`** 임시 저장소다 (추후 DB 이전 예정). 키는 점포·POS·거래번호 조합(`CartKey`, `@EqualsAndHashCode`)이고, POS 여러 대의 동시 요청을 전제로 동시 접근에 안전한 맵을 쓴다. 서버 재시작 시 장바구니가 사라진다. 상품 정보만 `ProductMapper`로 DB(`PRODUCT`)에서 조회.
 
 ### 결제 흐름 (`CheckoutServiceImpl.checkOut`, `@Transactional`)
 1. 인메모리 Cart → `CartSummary` + `Payment` → `Sale` 도메인 생성
 2. `CheckoutRepositoryImpl.save`: `SALES` insert(생성키로 `SALE_ID` 획득) → `SALE_LINES` → `PAYMENTS` → 현금이면 `CASH_PAYMENTS` + `RECEIPT_JOURNAL`(`Sale`을 Jackson으로 JSON 직렬화해 저장)
 3. 커밋 후(`TransactionSynchronization.afterCommit`) 인메모리 장바구니 삭제
 
-거래 조회/반품은 DB에서 `SALE_LINES`·`PAYMENTS`를 거래 키로 읽어 `Cart`/`Payment`/`Sale`을 재구성한다. 반품은 원거래를 `refundAll()` 처리한 뒤 새 거래 키로 반품 `Sale`(`Sale.refundedOf`)을 새로 저장.
+거래 조회/반품은 DB에서 `SALE_LINES`·`PAYMENTS`를 거래 키로 읽어 `Cart`/`Payment`/`Sale`을 재구성한다 (복원은 `restoredOf` 팩토리로 저장값을 그대로 사용, 없는 거래는 `TransactionNotFoundException`). 반품(`@Transactional`)은 원거래 `SALE_STATUS`를 조건부 UPDATE로 `REFUNDED`로 바꾸고(이미 반품됐으면 거절), 원거래를 `refundAll()` 처리한 뒤 새 거래 키로 반품 `Sale`(`Sale.refundedOf`)을 새로 저장. 반품 금액은 결제액 기준이고 청구액·받은 금액은 음수로 저장된다.
 
 ### 미완성 부분
-- 카드 결제(`CARD`)는 미구현 — 서비스에서 `null` 반환, 저장 시 `UnsupportedOperationException`.
+- 카드 결제(`CARD`)는 미구현 — 서비스에서 `UnsupportedOperationException`.
 - 재고 차감(`updateProductStock`)은 매퍼만 있고 호출부는 주석 처리됨.
 - `ProductController`의 엔드포인트는 주석 처리됨.
 - 일부 `@GetMapping` 엔드포인트가 `@RequestBody`를 받음 (`/api/cart/item`, `/api/checkout/transaction/call` 등) — 호출 시 GET에 JSON 바디를 보내야 함.
