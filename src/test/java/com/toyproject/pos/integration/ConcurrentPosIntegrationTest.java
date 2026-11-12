@@ -23,7 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>테스트 프로필은 커넥션 풀이 1개라 요청이 모두 직렬화되므로, 이 클래스만 풀을 4개로 늘린다.
  * (별도 Spring 컨텍스트가 뜨면서 시드가 다시 실행되지만, 시드는 맨 앞에서 전체 DELETE 하므로 안전하다.)</p>
  *
- * <p>장바구니 담기는 인메모리 맵이 스레드에 안전하지 않아(N5) 동시에 실행하지 않고, 출발 전에 순서대로 담는다.</p>
+ * <p>결제·반품 시나리오는 DB 동시성을 보려는 것이라 장바구니 담기는 출발 전에 순서대로 한다.
+ * 담기 자체의 동시성은 {@link #addItems_concurrently_onManyCarts()} 에서 따로 확인한다.</p>
  */
 @TestPropertySource(properties = "spring.datasource.hikari.maximum-pool-size=4")
 class ConcurrentPosIntegrationTest extends PosApiTestSupport {
@@ -101,6 +102,51 @@ class ConcurrentPosIntegrationTest extends PosApiTestSupport {
             }
         } finally {
             pool.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("POS 여러 대가 서로 다른 거래에 동시에 담아도 모든 장바구니가 정확하다 (인메모리 저장소 동시성)")
+    void addItems_concurrently_onManyCarts() throws Exception {
+        int threads = 8;
+        int cartsPerThread = 50; // 맵 크기가 여러 번 늘어나도록 많은 카트를 만든다
+
+        List<List<String>> tranNos = new ArrayList<>();
+        for (int t = 0; t < threads; t++) {
+            List<String> mine = new ArrayList<>();
+            for (int i = 0; i < cartsPerThread; i++) mine.add(newTranNo());
+            tranNos.add(mine);
+        }
+
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        try {
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<List<Integer>>> results = new ArrayList<>();
+            for (int t = 0; t < threads; t++) {
+                String posNo = String.format("%02d", t + 1);
+                List<String> mine = tranNos.get(t);
+                results.add(pool.submit(awaiting(start, () -> {
+                    List<Integer> statuses = new ArrayList<>();
+                    for (String tranNo : mine)
+                        statuses.add(json(addItem(posNo, tranNo, CHIPS)).get("status").asInt());
+                    return statuses;
+                })));
+            }
+            start.countDown();
+
+            for (Future<List<Integer>> r : results)
+                assertThat(r.get(60, TimeUnit.SECONDS)).containsOnly(200);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        for (int t = 0; t < threads; t++) {
+            String posNo = String.format("%02d", t + 1);
+            for (String tranNo : tranNos.get(t)) {
+                JsonNode lines = json(getCart(posNo, tranNo)).get("linesList");
+                assertThat(lines).hasSize(1);
+                assertThat(lines.get(0).get("qty").asInt()).isEqualTo(1);
+            }
         }
     }
 

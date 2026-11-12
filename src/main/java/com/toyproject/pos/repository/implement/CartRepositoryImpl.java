@@ -10,18 +10,20 @@ import org.springframework.stereotype.Repository;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Repository
 @RequiredArgsConstructor
 public class CartRepositoryImpl implements CartRepository {
 
     // 키: 점포·POS·거래번호 (CartKey)
-    private final Map<CartKey, Cart> cartStore = new LinkedHashMap<>(); // 순서 고려 하기 위해 LinkedHashMap 사용
+    // POS 여러 대의 요청이 동시에 들어오므로 동시 접근에 안전한 맵 사용 (순서는 쓰는 곳 없음)
+    private final Map<CartKey, Cart> cartStore = new ConcurrentHashMap<>();
 
     // 현재 저장 된, 카트 모델 조회
     @Override
     public Cart getCurrentCart(CartKey cartKey) {
-        // cartStore 에서 있으면 기존 카트 모델 반환, 없으면 LinkedHashMap 생성 후 반환
+        // cartStore 에서 있으면 기존 카트 모델 반환, 없으면 새 카트 생성 후 반환
         return cartStore.computeIfAbsent(cartKey, key ->
                 Cart.of(cartKey, new LinkedHashMap<>())
         );
