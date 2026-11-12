@@ -7,8 +7,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.ZoneId;
-
 @Getter
 @AllArgsConstructor
 @Builder(toBuilder = true)
@@ -60,7 +58,7 @@ public class Sale {
 
     private static String getReceiptNo(CartSummary cartSummary) {
         return cartSummary.getStrCd()
-                + "-" + DateFormatUtil.nowDate(ZoneId.systemDefault())
+                + "-" + DateFormatUtil.nowDate(DateFormatUtil.POS_ZONE)
                 + "-" + cartSummary.getPosNo()
                 + "-" + cartSummary.getTranNo()
                 ;

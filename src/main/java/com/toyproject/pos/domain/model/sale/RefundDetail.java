@@ -5,8 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.ZoneId;
-
 @Getter
 @AllArgsConstructor
 @Builder
@@ -28,7 +26,7 @@ public class RefundDetail {
         return RefundDetail.builder()
                 .origSaleId(sale.getSaleId())
                 .origReceiptNo(sale.getReceiptNo())
-                .refundedAt(DateFormatUtil.nowDate(ZoneId.systemDefault()))
+                .refundedAt(DateFormatUtil.nowDate(DateFormatUtil.POS_ZONE))
                 .reason(reason)
                 .build();
     }

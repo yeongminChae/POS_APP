@@ -8,7 +8,6 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
-import java.time.ZoneId;
 
 @Getter
 @AllArgsConstructor
@@ -80,7 +79,7 @@ public class CommonPaymentData {
     }
 
     private static String dateTimeFormat() {
-        return DateFormatUtil.nowDateTime(ZoneId.of("Asia/Seoul"));
+        return DateFormatUtil.nowDateTime(DateFormatUtil.POS_ZONE);
     }
 
 }

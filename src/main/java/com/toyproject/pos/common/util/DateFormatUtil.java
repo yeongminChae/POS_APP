@@ -4,8 +4,11 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
-// 현재 시각 포맷 공용 유틸 (타임존은 호출부에서 지정)
+// 현재 시각 포맷 공용 유틸
 public final class DateFormatUtil {
+
+    // 점포 기준 타임존. 서버 기본 타임존(ZoneId.systemDefault)과 무관하게 영수증·결제·반품 일시에 사용
+    public static final ZoneId POS_ZONE = ZoneId.of("Asia/Seoul");
 
     private static final String DATE_PATTERN = "yyyyMMdd";
     private static final String DATE_TIME_PATTERN = "yyyy-MM-dd HH:mm:ss";
