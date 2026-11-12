@@ -44,8 +44,9 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
 
     @Test
     @DisplayName("받은 금액 0 이하는 IllegalArgumentException(500)")
-    void zeroCash_throws() {
+    void zeroCash_throws() throws Exception {
         String tranNo = newTranNo();
+        addItem(POS_1, tranNo, CHIPS); // 빈 카트 검사(B5)보다 받은 금액 검사가 먼저 보이도록 상품을 담는다
 
         assertThatThrownBy(() -> checkoutCash(POS_1, tranNo, 0))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
@@ -54,14 +55,27 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 빈 장바구니도 결제되어 0원 거래가 저장된다")
-    void emptyCart_isCheckedOut() throws Exception {
+    @DisplayName("빈 장바구니 결제는 IllegalStateException(500), 저장 없음")
+    void emptyCart_isRejected() {
         String tranNo = newTranNo();
 
-        JsonNode sale = json(checkoutCash(POS_1, tranNo, 1000));
+        assertThatThrownBy(() -> checkoutCash(POS_1, tranNo, 1000))
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("결제할 상품이 없습니다.");
+        assertThat(countSales(POS_1, tranNo)).isZero();
+    }
 
-        assertThat(sale.at("/cart/lines")).isEmpty();
-        assertThat(amt(saleRow(POS_1, tranNo).get("TOTAL_AMOUNT"))).isEqualByComparingTo("0");
+    @Test
+    @DisplayName("담은 상품을 모두 취소한 장바구니도 결제 거절")
+    void allCancelledCart_isRejected() throws Exception {
+        String tranNo = newTranNo();
+        addItem(POS_1, tranNo, CHIPS);
+        cancelItem(POS_1, tranNo, CHIPS);
+
+        assertThatThrownBy(() -> checkoutCash(POS_1, tranNo, 1000))
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("결제할 상품이 없습니다.");
+        assertThat(countSales(POS_1, tranNo)).isZero();
     }
 
     @Test

@@ -107,6 +107,10 @@ public class CheckoutServiceImpl implements CheckoutService {
     private Sale saleModelBuilder(PaymentReqDto paymentReq) {
         Cart cart = getCurrentCart(paymentReq);
 
+        // 정상(NORMAL) 라인이 하나도 없으면 결제 불가 (빈 카트, 전부 취소한 카트)
+        if (cart.getTotalQtyInLines() == 0)
+            throw new IllegalStateException("결제할 상품이 없습니다.");
+
         CartSummary cartSummary = CartSummary.of(cart);
         Payment cashPayment = getPaymentSummary(paymentReq, cart.getTotalAmountInLines());
 
