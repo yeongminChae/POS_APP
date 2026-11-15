@@ -1,9 +1,11 @@
 # 아키텍처 분석 및 리팩토링 계획
 
+> **상태: 리팩토링 완료.** 1·2장(구조도·문제점)은 리팩토링 **전** 코드(`d2a038f`) 기준 기록이라 지금 구조와 다르다. 현재 진행 상황은 [README.md](README.md), 버그 처리 결과는 [bugfix-plan.md](bugfix-plan.md), API 변경은 [api-change-plan.md](api-change-plan.md).
+
 > 기준 커밋: `d2a038f` · 작성 시점의 코드만 분석했고 코드는 수정하지 않았다.
 > 라인 번호는 `src/main/java/com/toyproject/pos/` 기준 상대 경로다.
 > 1·2·4장의 라인 번호는 기준 커밋(`d2a038f`) 시점이다. **3장(버그·API 표)의 라인 번호는 리팩토링 완료 커밋 `9fd71ef` 기준으로 보정했다.**
-> 현재 동작은 `src/test/java/com/toyproject/pos/integration/` 통합 테스트 24개로 고정되어 있다.
+> 작성 당시 동작은 `src/test/java/com/toyproject/pos/integration/` 통합 테스트 24개로 고정했다 (지금은 46개).
 
 ## 1. 현재 아키텍처
 
@@ -201,6 +203,8 @@ sequenceDiagram
 R1 ~ R12 (아래 4장)
 
 ### 3.2 버그 수정 (동작이 바뀜 — 해당 `[현재 동작/버그]` 테스트의 기대값을 바꿔야 함)
+
+> 처리 결과: [bugfix-plan.md](bugfix-plan.md) 7장. B11·B13은 API 변경 단계(A4·A6)로 넘어갔고, B12c·B12d·B14b·B17은 보류.
 | ID | 내용 | 근거 | 깨질 테스트 |
 |---|---|---|---|
 | B1 | 카트 키가 `tranNo`만 사용 → POS·점포 간 섞임 | `CartRepositoryImpl.java:24`, `:33`, `:57` | `CartIntegrationTest.sameTranNo_differentPos_sharesCart`, `sameTranNo_differentStore_sharesCart` |
@@ -222,6 +226,8 @@ R1 ~ R12 (아래 4장)
 | B17 | enum ↔ DB CHECK 불일치 | `docs/schema-issues.md` 7번 | (없음) |
 
 ### 3.3 API 변경 (요청/응답 계약이 바뀜)
+
+> 계획: [api-change-plan.md](api-change-plan.md) (구현 전).
 | ID | 내용 | 근거 | 깨질 테스트 |
 |---|---|---|---|
 | A1 | GET + RequestBody → 쿼리 파라미터/경로 변수 | `controller/CartController.java:24-25`, `controller/CheckoutController.java:21-29` | `PosApiTestSupport`의 `getCart`, `callTransaction` 및 이를 쓰는 대부분 |
@@ -279,20 +285,9 @@ R1 ~ R12 (아래 4장)
 1. **버그 수정**: B7(결제 ID) → B6(반품 트랜잭션) → B2·B3(금액) → B4(중복 반품) → B8·B9(조회/NPE) → B1(카트 키) → 나머지. 각 수정마다 해당 `[현재 동작/버그]` 테스트의 기대값을 새 동작으로 바꾸는 것을 같은 커밋에 포함한다 (커밋 타입 `fix`).
 2. **API 변경**: A4(예외→HTTP 상태) → A6(요청 검증) → A5(카트 응답 DTO) → A3(응답 형식) → A1·A2(GET 바디 제거). API 변경은 버그 수정·리팩토링과 섞지 않는다 (CLAUDE.md 커밋 규칙).
 
-## 6. 진행 메모
+## 6. 진행 현황
 
-### 배치 1 (R1 → R2 → R3 → R4) 완료 후
-
-계획과 달랐던 점 / 다음에 처리할 것:
-- **R1**: `controller/CartController.java`의 `Cart` import는 실제로 사용 중(`getCurrentCart` 반환 타입)이라 유지. 2.5의 "미사용 import" 목록에서 `Cart`는 잘못된 항목.
-- **R1**: `service/implement/CartServiceImpl.java`의 주석 처리된 재고 갱신 코드(`productService.updateStock(...)`)는 R1 영향 파일 목록에 없어서 남겨둠. B12(재고 차감) 작업 때 실제 코드로 바꾸거나 삭제.
-- **R1**: `UpdateQtyRequest`는 A6에서 쓸 예정이라 유지.
-- **R2**: `RefundReqDto`에는 `getKey()`를 추가하지 않음(영향 파일 목록에 없음). `CheckoutServiceImpl.refundTransaction`의 `refundReqDto.getCartInfoReqDto().getKey()` 1곳이 남아 있음 → R10(거래 복원 중복 제거) 때 함께 처리 권장.
-- **R3**: `CheckoutRepositoryImpl.save`의 `case CARD:` 뒤 주석 `// break;`(throw 뒤라 도달 불가)는 남겨둠. L5/B9 때 정리.
-- **R3 → R6 참고**: `CashPaymentRow.getChangeCash`의 "현금이 아니면 null" 분기는 `save`의 `case CASH`에서만 호출되므로 도달 불가. R6에서 거스름돈 계산을 옮길 때 이 분기는 없애도 동작이 같다.
-- **라인 번호**: 배치 1 이후 2~4장의 라인 번호가 일부 어긋남 (`CartServiceImpl`, `CartRepositoryImpl`, `CheckoutRepositoryImpl`). 다음 배치 전에 근거 라인을 다시 확인할 것.
-
-## 7. 진행 현황
+> 리팩토링 단계 **완료** (R1~R12 + 잔여 정리 2건, 마지막 커밋 `f858f26`).
 
 | 순서 | 항목 | 커밋 | 비고 |
 |---|---|---|---|
@@ -314,6 +309,19 @@ R1 ~ R12 (아래 4장)
 버그 수정 단계: [bugfix-plan.md](bugfix-plan.md) 참고
 
 API 변경 단계: [api-change-plan.md](api-change-plan.md) 참고
+
+## 7. 진행 메모
+
+### 배치 1 (R1 → R2 → R3 → R4) 완료 후
+
+계획과 달랐던 점 / 다음에 처리할 것:
+- **R1**: `controller/CartController.java`의 `Cart` import는 실제로 사용 중(`getCurrentCart` 반환 타입)이라 유지. 2.5의 "미사용 import" 목록에서 `Cart`는 잘못된 항목.
+- **R1**: `service/implement/CartServiceImpl.java`의 주석 처리된 재고 갱신 코드(`productService.updateStock(...)`)는 R1 영향 파일 목록에 없어서 남겨둠. B12(재고 차감) 작업 때 실제 코드로 바꾸거나 삭제.
+- **R1**: `UpdateQtyRequest`는 A6에서 쓸 예정이라 유지.
+- **R2**: `RefundReqDto`에는 `getKey()`를 추가하지 않음(영향 파일 목록에 없음). `CheckoutServiceImpl.refundTransaction`의 `refundReqDto.getCartInfoReqDto().getKey()` 1곳이 남아 있음 → R10(거래 복원 중복 제거) 때 함께 처리 권장.
+- **R3**: `CheckoutRepositoryImpl.save`의 `case CARD:` 뒤 주석 `// break;`(throw 뒤라 도달 불가)는 남겨둠. L5/B9 때 정리.
+- **R3 → R6 참고**: `CashPaymentRow.getChangeCash`의 "현금이 아니면 null" 분기는 `save`의 `case CASH`에서만 호출되므로 도달 불가. R6에서 거스름돈 계산을 옮길 때 이 분기는 없애도 동작이 같다.
+- **라인 번호**: 배치 1 이후 2~4장의 라인 번호가 일부 어긋남 (`CartServiceImpl`, `CartRepositoryImpl`, `CheckoutRepositoryImpl`). 다음 배치 전에 근거 라인을 다시 확인할 것.
 
 ### 배치 2 (R7 → R6 → R8 → R5) 계획 수정 사항 / 메모
 

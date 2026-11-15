@@ -1,5 +1,7 @@
 # API 변경 계획
 
+> **상태: 계획 완료, 구현 전.** 결정(Q1~Q10, 5장)·사전 확인(X1~X3, 8장) 끝. 다음 작업은 배치 A의 A0-0부터. `36c3353` 이후 커밋은 문서뿐이라 코드·라인 번호는 그대로 유효하다 (`f31dc92` 기준 확인).
+
 > 기준 커밋: `36c3353` (버그 수정 단계 완료, 테스트 46개 통과·스킵 0). 이 문서를 쓰는 동안 코드는 수정하지 않았다.
 > API 변경 ID(A1~A7)는 `docs/architecture.md` 3.3절 기준. 보류해 둔 B11·B13과 빈 TODO(L2)는 이 단계에서 함께 처리한다.
 > 라인 번호는 `src/main/java/com/toyproject/pos/` 기준, 모두 `36c3353` 시점.
@@ -16,7 +18,7 @@
 
 | 배치 | 내용 | 바뀌는 계약 |
 |---|---|---|
-| A0 준비 | 전용 예외 클래스 도입(refactor), B11 결제 전 중복 거래번호 확인(fix) | 없음 (여전히 500) |
+| A0 준비 | 남은 주석·중복 코드 정리(refactor), 전용 예외 클래스 도입(refactor), B11 결제 전 중복 거래번호 확인(fix) | 없음 (여전히 500) |
 | A4 | 전역 예외 처리기 + 오류 응답 형식 | 오류 응답 전부 (500 → 400/404/409) |
 | A6 | 요청 검증(`@Valid`), 빈 TODO 제거, B13 | 잘못된 요청 → 400 |
 | A5 | 카트·요약 응답 전용 DTO | 카트 조회·요약 응답 JSON 키 |
@@ -136,6 +138,19 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 표기: **바뀌는 테스트** = 기대값을 새 계약으로 바꾸는 기존 테스트. 여기에 없는 테스트가 깨지면 멈추고 보고한다 (버그 수정 단계와 같은 규칙).
 
 ### A0 — 준비 (계약 변경 없음)
+
+**A0-0 `refactor: 주석 처리된 코드와 중복 원거래 ID 설정 제거`** (계획 정리 중 새로 확인한 잔여 정리)
+- 리팩토링 R1(죽은 코드 제거) 때 영향 파일 목록에 없어 남은 주석 코드
+  - `persistence/mapper/CheckoutMapper.java:30`, `:32` — 주석 처리된 `selectSaleLinesBySaleId`·`selectPaymentBySaleId`
+  - `resources/mapper/CheckoutMapper.xml:190~216` — 같은 두 쿼리의 주석 처리된 `<select>`
+  - `service/interfaces/CheckoutService.java:12` — 주석 처리된 `getSaleData`
+- 중복 호출: `CheckoutServiceImpl.refundTransaction`의 `saleResDto.withOriginSaleId(sale.getSaleId())` — B8 이후 `SaleResDto.of`가 `refundDetail`에서 같은 값을 채움 (bugfix-plan.md 배치 2 메모). 호출과 `SaleResDto.withOriginSaleId` 메서드 삭제
+- 그대로 두는 것
+  - `controller/ProductController.java`: 엔드포인트 없는 빈 컨트롤러지만, 상품 API 자리로 남긴다 (삭제해도 동작은 같음 — 필요하면 이 커밋에 포함)
+  - `UpdateQtyRequest`: A6에서 `UpdateQtyReqDto`로 대체하면서 삭제
+  - `CheckoutRepositoryImpl.save`의 도달 불가 `case CARD`: L5(카드 결제 구현) 때
+- 보호 테스트: 전체 (기대값 변경 0건). 반품 응답의 `origSaleId`는 `fullScenario`·`callRefundTransaction_returnsRefund`가 검사
+- 위험도: 하
 
 **A0-1 `refactor: 업무 예외를 의미별 전용 클래스로 분리`**
 - `common/exception/ErrorCode`(enum: code, HTTP 상태), `PosException`(추상, `RuntimeException` 상속, `ErrorCode` 보유) 추가
@@ -298,7 +313,7 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 4. 커밋: API 변경은 `feat(api)`, refactor·fix와 섞지 않음. 커밋 전에 메시지·파일 확인 (배치 단위로 한 번에 승인)
 5. 배치마다 7장(진행 현황)에 기록하는 `docs` 커밋
 
-배치 묶음 제안: **배치 A = A0-1, A0-2, A4** (오류 계약) → **배치 B = A6, A5** → **배치 C = A3, A1·A2, A7, 문서**. 배치 A가 테스트 변경이 가장 많고 위험도가 높다.
+배치 묶음 제안: **배치 A = A0-0, A0-1, A0-2, A4** (정리 + 오류 계약) → **배치 B = A6, A5** → **배치 C = A3, A1·A2, A7, 문서**. 배치 A가 테스트 변경이 가장 많고 위험도가 높다.
 
 ## 7. 진행 현황
 

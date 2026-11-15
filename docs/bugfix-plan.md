@@ -1,5 +1,7 @@
 # 버그 수정 계획
 
+> **상태: 완료** (배치 1~5, `f63e6d6` ~ `36c3353`). 결과 요약·보류 항목은 7장 끝 "버그 수정 단계 마무리". 1~6장은 계획 당시(`f858f26`) 기준 기록이다.
+
 > 기준 커밋: `f858f26` (리팩토링 1~14 완료 시점). 이 문서를 쓰는 동안 코드는 수정하지 않았다.
 > 버그 ID(B1~B17)와 테스트 이름은 `docs/architecture.md` 3.2절과 `src/test/java/com/toyproject/pos/integration/` 기준이다.
 > 라인 번호는 `src/main/java/com/toyproject/pos/` 기준 상대 경로이고, 모두 `f858f26` 시점이다.
@@ -529,13 +531,32 @@ flowchart LR
 
 ## 7. 진행 현황
 
-| 순서 | 항목 | 커밋 | 비고 |
-|---|---|---|---|
-| 1 | B7 결제 ID 연결 | `f63e6d6` | `cashPaymentId_isIndependentSequence` → `cashPaymentId_matchesPaymentId` |
-| 1-1 | POS 2대 동시 결제·반품 테스트 | `c266255` | 신규 `ConcurrentPosIntegrationTest` |
-| 1-2 | IMMEDIATE + busy_timeout 설정 | `5d9d328` | 드라이버 속성으로 설정 (아래 메모) |
-| 2 | B6 반품 트랜잭션 | `e68950d` | `refund_isNotAtomic`(@Disabled) → `refund_isAtomic` |
-| 3 | B16 TR_JSON saleId | `bf74360` | |
+> 버그 수정 단계 **완료** (배치 1~5, 마지막 커밋 `36c3353`). 테스트 27개(스킵 1) → 46개(스킵 0). 배치별 메모는 표 아래.
+
+| 순서 | 배치 | 항목 | 커밋 | 비고 |
+|---|---|---|---|---|
+| 1 | 1 | B7 결제 ID 연결 | `f63e6d6` | `cashPaymentId_isIndependentSequence` → `cashPaymentId_matchesPaymentId` |
+| 1-1 | 1 | POS 2대 동시 결제·반품 테스트 | `c266255` | 신규 `ConcurrentPosIntegrationTest` |
+| 1-2 | 1 | IMMEDIATE + busy_timeout 설정 | `5d9d328` | 드라이버 속성으로 설정 (아래 메모) |
+| 2 | 1 | B6 반품 트랜잭션 | `e68950d` | `refund_isNotAtomic`(@Disabled) → `refund_isAtomic` |
+| 3 | 1 | B16 TR_JSON saleId | `bf74360` | |
+| 4 | 2 | B2 반품 금액 | `b602c7f` | `fullScenario` 반품 금액 −10500 / −10500 / 0 |
+| 5 | 2 | N1 반품 시각·키 | `f34af74` | 신규 `refund_hasOwnApprovedAtAndKey` |
+| 6 | 2 | B8 반품 거래 조회 (+N2, N3) | `3423fa8` | `callRefundTransaction_throws` → `callRefundTransaction_returnsRefund` |
+| 7 | 2 | B3 받은 금액 부족 거절 | `7185380` | `insufficientCash_isApproved` → `insufficientCash_isRejected`, 신규 `exactCash_isApproved` |
+| 8 | 3 | B5 빈 카트 거절 | `598c1c9` | `emptyCart_isCheckedOut` → `emptyCart_isRejected`, 신규 `allCancelledCart_isRejected`, `zeroCash_throws`는 상품을 먼저 담도록 수정 |
+| 9 | 3 | B4 중복 반품 거절 | `3de7370` | `refundTwice_isAllowed` → `refundTwice_isRejected`, 신규 `refundOfRefund_isRejected`·`sameOriginal_refundedConcurrently_onlyOnce`, `fullScenario` 원거래 상태 `REFUNDED` |
+| 10 | 3 | B9 없는 거래·카드 결제 | `c8dd41b` | `..._throwsNpe` 2개 → `callUnknownTransaction_throwsNotFound`·`cardPayment_isUnsupported`, 신규 `refundUnknownTransaction_throwsNotFound` |
+| 11 | 3 | B1 카트 키 | `6f3e04b` | `sameTranNo_*_sharesCart` 2개 → `..._isolated` |
+| 11-1 | 3 | N5 장바구니 동시성 | `44c9cf6` | 신규 `addItems_concurrently_onManyCarts` |
+| 11-2 | 3 | afterCommit 콜백 정리 | — | **건너뜀** (B1에서 `clearCart(Sale)` 시그니처를 유지해 T3를 건드릴 필요가 없었음) |
+| 12 | 4 | B12a 재고 차감·복원 | `432bf07` | `checkout_doesNotDecreaseStock` → `checkout_decreasesStock`, 신규 `checkout_skipsCancelledLines`·`refund_restoresStock`·`failedCheckout_doesNotDecreaseStock`, `discontinuedProduct_isSellable` 재고 0 → −1, 동시성 테스트에 재고 단언 |
+| 13 | 4 | B12b 판매중지 거절 | `2b61a0a` | `discontinuedProduct_isSellable` → `discontinuedProduct_isRejected`, 신규 `suspendOrderAndNullStatus_areSellable` |
+| 14 | 4 | B10 예외 전파 | `2e364ee` | 신규 단위 테스트 `CartServiceImplTest` (4개) |
+| 15 | 4 | T2 조회 트랜잭션 | — | 보류 (8장) |
+| 16 | 5 | B14a 반품 사유 저장 | `7059f4f` | `refundReason_isIgnored` → `refundReason_isSaved`, 신규 `refundWithoutReason_isNull` |
+| 17 | 5 | B15 타임존 통일 | `6c3e630` | 신규 단위 테스트 `SaleTimeZoneTest` (2개) |
+| 18 | 5 | N4 `JournalDataRow` 죽은 필드 제거 | `9381c24` | refactor, 테스트 변경 없음 |
 
 ### 배치 1 메모
 
@@ -552,13 +573,6 @@ flowchart LR
   - 그래서 `application-test.yml`은 바꾸지 않았고(기본 설정을 상속), CLAUDE.md는 "명령어" 절 대신 "DB" 절에 설정 설명 한 줄을 추가했다
 - B7: 복원한 `CommonPaymentData`에 `paymentId`를 채우지만, 응답·TR_JSON에는 노출하지 않는다 (계획대로)
 - 계획에 없는 테스트 기대값 변경: **없음**
-
-| 순서 | 항목 | 커밋 | 비고 |
-|---|---|---|---|
-| 4 | B2 반품 금액 | `b602c7f` | `fullScenario` 반품 금액 −10500 / −10500 / 0 |
-| 5 | N1 반품 시각·키 | `f34af74` | 신규 `refund_hasOwnApprovedAtAndKey` |
-| 6 | B8 반품 거래 조회 (+N2, N3) | `3423fa8` | `callRefundTransaction_throws` → `callRefundTransaction_returnsRefund` |
-| 7 | B3 받은 금액 부족 거절 | `7185380` | `insufficientCash_isApproved` → `insufficientCash_isRejected`, 신규 `exactCash_isApproved` |
 
 ### 배치 2 메모
 
@@ -578,15 +592,6 @@ flowchart LR
 - **운영 데이터**: 운영 DB의 기존 반품 1건(SALE_ID 3)은 이제 조회되지만, 저장된 옛 값(받은 금액 −300000, 거스름돈 −374600, 청구액 +74600)이 그대로 보인다 (8장 E3). 보정은 하지 않음
 - 계획에 없는 테스트 기대값 변경: **없음**
 
-| 순서 | 항목 | 커밋 | 비고 |
-|---|---|---|---|
-| 8 | B5 빈 카트 거절 | `598c1c9` | `emptyCart_isCheckedOut` → `emptyCart_isRejected`, 신규 `allCancelledCart_isRejected`, `zeroCash_throws`는 상품을 먼저 담도록 수정 |
-| 9 | B4 중복 반품 거절 | `3de7370` | `refundTwice_isAllowed` → `refundTwice_isRejected`, 신규 `refundOfRefund_isRejected`·`sameOriginal_refundedConcurrently_onlyOnce`, `fullScenario` 원거래 상태 `REFUNDED` |
-| 10 | B9 없는 거래·카드 결제 | `c8dd41b` | `..._throwsNpe` 2개 → `callUnknownTransaction_throwsNotFound`·`cardPayment_isUnsupported`, 신규 `refundUnknownTransaction_throwsNotFound` |
-| 11 | B1 카트 키 | `6f3e04b` | `sameTranNo_*_sharesCart` 2개 → `..._isolated` |
-| 11-1 | N5 장바구니 동시성 | `44c9cf6` | 신규 `addItems_concurrently_onManyCarts` |
-| 11-2 | afterCommit 콜백 정리 | — | **건너뜀** (B1에서 `clearCart(Sale)` 시그니처를 유지해 T3를 건드릴 필요가 없었음) |
-
 ### 배치 3 메모
 
 - 테스트: 30개 → **35개**(스킵 0). 늘어난 5개는 `allCancelledCart_isRejected`, `refundOfRefund_isRejected`, `sameOriginal_refundedConcurrently_onlyOnce`, `refundUnknownTransaction_throwsNotFound`, `addItems_concurrently_onManyCarts`
@@ -602,13 +607,6 @@ flowchart LR
 - **N5 구현**: `ConcurrentHashMap`으로 교체. 삽입 순서를 쓰는 곳(맵 순회)은 없음을 확인
 - **CLAUDE.md 갱신** (docs 커밋에 포함): 장바구니 저장소 설명(`LinkedHashMap<tranNo, Cart>` → `ConcurrentHashMap<CartKey, Cart>`), 조회·반품 흐름(복원·원거래 상태·음수 금액), 카드 결제 설명
 - 계획에 없는 테스트 기대값 변경: **없음**
-
-| 순서 | 항목 | 커밋 | 비고 |
-|---|---|---|---|
-| 12 | B12a 재고 차감·복원 | `432bf07` | `checkout_doesNotDecreaseStock` → `checkout_decreasesStock`, 신규 `checkout_skipsCancelledLines`·`refund_restoresStock`·`failedCheckout_doesNotDecreaseStock`, `discontinuedProduct_isSellable` 재고 0 → −1, 동시성 테스트에 재고 단언 |
-| 13 | B12b 판매중지 거절 | `2b61a0a` | `discontinuedProduct_isSellable` → `discontinuedProduct_isRejected`, 신규 `suspendOrderAndNullStatus_areSellable` |
-| 14 | B10 예외 전파 | `2e364ee` | 신규 단위 테스트 `CartServiceImplTest` (4개) |
-| 15 | T2 조회 트랜잭션 | — | 보류 (8장) |
 
 ### 배치 4 메모
 
@@ -630,12 +628,6 @@ flowchart LR
 - **⚠️ 시연 전 확인**: 운영 상품의 29%(35,282건)가 `discontinued`라 이제 담을 수 없다 (8장 E4). 시연용 바코드의 `PRODUCT_STATUS`를 확인할 것
 - **CLAUDE.md 갱신** (docs 커밋에 포함): 결제 흐름에 재고 반영 단계, 상품 담기 예외 정책, "재고 차감 미구현" 항목 삭제
 - 계획에 없는 테스트 기대값 변경: **없음**
-
-| 순서 | 항목 | 커밋 | 비고 |
-|---|---|---|---|
-| 16 | B14a 반품 사유 저장 | `7059f4f` | `refundReason_isIgnored` → `refundReason_isSaved`, 신규 `refundWithoutReason_isNull` |
-| 17 | B15 타임존 통일 | `6c3e630` | 신규 단위 테스트 `SaleTimeZoneTest` (2개) |
-| 18 | N4 `JournalDataRow` 죽은 필드 제거 | `9381c24` | refactor, 테스트 변경 없음 |
 
 ### 배치 5 메모
 
@@ -749,35 +741,3 @@ flowchart LR
 - MyBatis XML: `ORDER BY ... LIMIT 1`, 서브쿼리 등은 대부분 그대로 쓸 수 있다. SQLite 전용 `PRAGMA`·트리거 기반 테스트(B6의 실패 주입)는 PostgreSQL 문법(`CREATE FUNCTION` + `CREATE TRIGGER`)으로 다시 작성해야 한다
 - 테스트: 파일 하나로 띄우던 테스트 DB를 Testcontainers 등으로 바꿔야 한다 (`build/test-db` 삭제 방식은 사라짐)
 - 인메모리 장바구니(N5)는 DB와 무관하다. 서버를 여러 대로 늘리려면 장바구니를 DB나 Redis로 옮겨야 한다 (CLAUDE.md의 "추후 DB 이전 예정")
-
-## 10. 배치 3 시작 체크리스트 (완료 — 결과는 7장 배치 3 메모)
-
-> 작성 기준: `f9c3ae6` (배치 2 완료, 푸시됨). 테스트 30개 통과, 스킵 0. 라인 번호는 이 커밋 기준.
-> "배치 3 시작"이라고 하면 아래 순서대로 바로 진행한다. 진행 규칙은 4.3절, 커밋은 배치 1·2와 같은 방식(항목별 체크포인트 → 전체 확인 후 한 번에 승인 → 항목별 커밋 + docs 커밋).
-
-### 시작 전 확인 (1분)
-- [ ] `git status` 깨끗한지, `main`이 `origin/main`과 같은지
-- [ ] `./gradlew test` → 30개 통과, 스킵 0
-
-### 순서와 작업 내용
-
-| # | 항목 | 먼저 바꿀 테스트 (빨간 상태 확인) | 수정 위치 | 커밋 |
-|---|---|---|---|---|
-| 8 | **B5** 빈 카트 거절 | `CheckoutEdgeIntegrationTest.emptyCart_isCheckedOut`(:58) → `emptyCart_isRejected`(루트 원인 `IllegalStateException("결제할 상품이 없습니다.")`, 저장 0건). 신규 `allCancelledCart_isRejected`(담기 → 취소 → 결제). **`zeroCash_throws`(:47)는 빈 카트라서 상품을 먼저 담도록 수정** (메시지 단언은 그대로) | `CheckoutServiceImpl.saleModelBuilder`(:107) — 결제 객체를 만들기 전에 `cart.getTotalQtyInLines() == 0`이면 예외 | `fix(checkout): 빈 장바구니 결제 거절` |
-| 9 | **B4** 중복 반품 거절 | `CheckoutScenarioIntegrationTest.refundTwice_isAllowed`(:152) → `refundTwice_isRejected`(두 번째 루트 원인 `IllegalStateException("이미 반품된 거래입니다.")`, `ORIG_SALE_ID` 건수 1). `fullScenario` :146-147 원거래 상태 `NORMAL` → `REFUNDED`(주석 삭제). `refund_isAtomic`에 "실패 시 원거래 상태는 `NORMAL` 그대로" 단언 추가. `ConcurrentPosIntegrationTest`에 **"POS 2대가 같은 원거래를 동시에 반품 → 정확히 1건 성공"** 테스트 추가 | `CheckoutMapper.xml`에 `UPDATE SALES SET SALE_STATUS='REFUNDED' WHERE SALE_ID=#{saleId} AND SALE_STATUS='NORMAL'`, `CheckoutMapper`·`CheckoutRepository(Impl)`에 메서드(영향 행 수 반환), `CheckoutServiceImpl.refundTransaction`(:69)에서 **반품 저장 전에** 호출하고 1행이 아니면 예외 | `fix(checkout): 반품 시 원거래 상태 갱신 및 중복 반품 거절` |
-| 10 | **B9** 없는 거래·카드 결제 | `callUnknownTransaction_throwsNpe`(:82) → `..._throwsNotFound`(루트 원인 `TransactionNotFoundException`). `cardPayment_throwsNpe`(:69) → `cardPayment_isUnsupported`(루트 원인 `UnsupportedOperationException`, 나머지 단언 그대로). 신규 `refundUnknownTransaction_throwsNotFound` | 신규 `common/exception/TransactionNotFoundException`. `CheckoutServiceImpl.loadTransaction`(:94)에서 **판매 행 존재를 먼저 확인** (지금은 `CheckoutRepositoryImpl.getPayment`:88에서 `paymentRow`가 null이라 NPE). `getPaymentSummary`의 `case CARD`(:125)에서 `UnsupportedOperationException` | `fix(checkout): 없는 거래 조회와 카드 결제를 명시적 예외로 처리` |
-| 11 | **B1** 카트 키 | `CartIntegrationTest.sameTranNo_differentPos_sharesCart`(:141) → `..._isolated`(POS 02 카트엔 CHOCO만, 결제는 POS 02로 저장, POS 01 카트 유지). `sameTranNo_differentStore_sharesCart`(:163) → `..._isolated` | `CartKey`에 `@EqualsAndHashCode` (지금 없음). `CartRepositoryImpl` 맵 키를 `CartKey`로(:18, :24, :33), `clearCartStore`(:56-57)가 판매의 점포·POS·거래번호로 키를 만들도록 | `fix(cart): 장바구니 키를 점포·POS·거래번호 조합으로 변경` |
-| 11-1 | **N5** 장바구니 동시성 | `ConcurrentPosIntegrationTest`에 "POS 여러 대가 서로 다른 거래에 동시에 담기 → 모든 카트 라인 수 정확" 추가. 경쟁 상태라 수정 전에 빨간 상태가 안 나올 수 있음 → 그 사실을 기록하고 진행 (5.1절) | `CartRepositoryImpl`(:18) `LinkedHashMap` → `ConcurrentHashMap` (삽입 순서를 쓰는 곳 없음 — 진행 시 다시 확인). `ConcurrentPosIntegrationTest`의 "동시에 담지 않는다" 주석 정리 | `fix(cart): 장바구니 저장소를 동시 접근에 안전한 맵으로 변경` |
-| — | docs | — | 7장에 배치 3 행·메모 추가, 해시 기입 | `docs: 버그 수정 3차 배치 진행 현황 기록` |
-
-### 진행 중 판단할 것 (미리 정해 둔 기본값)
-- **B4 예외 시점**: 원거래 상태 UPDATE를 반품 INSERT보다 **먼저** 한다 → 중복 반품은 INSERT를 시도하지 않음. 실패 시 B6 트랜잭션으로 UPDATE도 롤백됨 (`refund_isAtomic`으로 확인)
-- **B4 부수 효과**: 반품 거래(상태 `REFUNDED`)를 다시 반품하는 것도 막힌다 — 의도한 동작. 원거래를 조회하면 `saleStatus = REFUNDED`
-- **B9 존재 확인 방법**: `CheckoutRepository`에 판매 행 조회(예: `findSaleRow` 또는 `exists`)를 추가하거나, `loadTransaction`에서 `getTransaction`을 먼저 호출하도록 순서를 바꾸는 방법 중 diff가 작은 쪽. 응답에는 차이 없음
-- **B1과 T3**: `clearCart(Sale)` 시그니처는 그대로 두고 내부에서 키만 바꾸면 afterCommit 익명 클래스(T3)는 손댈 필요가 없다. 이 경우 11-2(콜백 정리 refactor)는 **건너뜀**
-- **멈춤 조건**: 위 표의 "먼저 바꿀 테스트" 외에 기대값이 바뀌면 커밋하지 않고 보고
-
-### 배치 3 이후
-- 배치 4: B12a 재고 차감·복원 (위험도 상) → B12b 판매중지 거절 (⚠️ 운영 상품의 29%가 `discontinued`, 시연용 바코드 확인 먼저) → B10 예외 전파
-- 배치 5: B14a 반품 사유 → B15 타임존 → N4 refactor
-- 별도 refactor 후보: `withOriginSaleId` 중복 호출 제거 (배치 2 메모)
