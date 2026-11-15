@@ -1,6 +1,6 @@
 # API 변경 계획
 
-> **상태: 계획 완료, 구현 전.** 결정(Q1~Q10, 5장)·사전 확인(X1~X3, 8장) 끝. 다음 작업은 배치 A의 A0-0부터. `36c3353` 이후 커밋은 문서뿐이라 코드·라인 번호는 그대로 유효하다 (`f31dc92` 기준 확인).
+> **상태: 계획 완료, 구현 전.** 결정(Q1~Q11, 5장)·사전 확인(X1~X3, 8장) 끝. 다음 작업은 배치 A의 A0-0부터. `36c3353` 이후 커밋은 문서뿐이라 코드·라인 번호는 그대로 유효하다 (`f31dc92` 기준 확인).
 
 > 기준 커밋: `36c3353` (버그 수정 단계 완료, 테스트 46개 통과·스킵 0). 이 문서를 쓰는 동안 코드는 수정하지 않았다.
 > API 변경 ID(A1~A7)는 `docs/architecture.md` 3.3절 기준. 보류해 둔 B11·B13과 빈 TODO(L2)는 이 단계에서 함께 처리한다.
@@ -14,7 +14,7 @@
 2. **응답 모양이 제각각이다** — 엔드포인트 7개가 `ApiResponseDto` / `boolean` / 도메인 객체(`Cart`, `CartSummary`) / `SaleResDto`를 섞어 돌려준다. `Cart`를 그대로 내보내서 내부 필드(`barcodeToLineMap`, `seq`)가 노출된다
 3. **GET에 JSON 바디를 받는다** — 브라우저·프록시·캐시 대부분이 GET 바디를 보장하지 않는다. 요약 API는 경로 변수를 받아 놓고 무시한다
 
-순서: **A0(준비) → A4 → A6 → A5 → A3 → A1·A2 → A7 → 문서**. architecture.md 5장 순서를 따르되, 예외 타입을 먼저 정리하는 준비 배치를 앞에 둔다.
+순서: **A0(준비) → A4 → A6 → A5 → A3 → A1·A2·A8(경로 재설계) → A8-1(컨트롤러 이름) → A7 → 문서**. architecture.md 5장 순서를 따르되, 예외 타입을 먼저 정리하는 준비 배치를 앞에 둔다.
 
 | 배치 | 내용 | 바뀌는 계약 |
 |---|---|---|
@@ -23,7 +23,8 @@
 | A6 | 요청 검증(`@Valid`), 빈 TODO 제거, B13 | 잘못된 요청 → 400 |
 | A5 | 카트·요약 응답 전용 DTO | 카트 조회·요약 응답 JSON 키 |
 | A3 | 성공 응답 형식 통일 (`boolean`·`ApiResponseDto` 제거) | 담기·수량 변경·취소 응답 |
-| A1·A2 | GET 바디 → 쿼리 파라미터 | GET 3개의 요청 방식 |
+| A1·A2·A8 | GET 바디 → 쿼리 파라미터, 경로를 자원 단위로 재설계 (Q11) | **모든 엔드포인트의 경로**, GET 3개의 요청 방식 |
+| A8-1 | `CheckoutController` → `SaleController` (refactor) | 없음 |
 | A7 | 현금 아닌 결제의 `payment.cash` = null | 결제 응답 (지금은 현금뿐이라 실제 변화 없음) |
 | 문서 | API 명세(`docs/api.md`), CLAUDE.md 갱신 | — |
 
@@ -108,17 +109,23 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 
 ### 2.3 엔드포인트별 목표
 
-| # | 목표 메서드·경로 (Q6) | 요청 | 성공 응답 (Q2, Q5) | 실패 |
-|---|---|---|---|---|
-| 1 | `GET /api/cart/item?strCd=&posNo=&tranNo=` | 쿼리 파라미터 | 200 `CartResDto` | 400 |
-| 2 | `POST /api/cart/item/add` | `ProductReqDto` | 200 `CartResDto` (담은 뒤 카트) | 400, 404 `PRODUCT_NOT_FOUND`, 409 `PRODUCT_DISCONTINUED` |
-| 3 | `POST /api/cart/item/add/many` | `List<ProductReqDto>` | 200 `CartResDto` | 2와 같음. **전부 아니면 전무** (Q4) |
-| 4 | `POST /api/cart/item/update/qty` | `UpdateQtyReqDto` (`qty` 필수, ≥ 1) | 200 `CartResDto` | 400, 404 `CART_LINE_NOT_FOUND` |
-| 5 | `POST /api/cart/item/cancel` | `ProductReqDto` | 200 `CartResDto` | 400, 404 `CART_LINE_NOT_FOUND` |
-| 6 | `GET /api/checkout/summary?strCd=&posNo=&tranNo=` | 쿼리 파라미터 | 200 `CartSummaryResDto` | 400 |
-| 7 | `GET /api/checkout/transaction/call?strCd=&posNo=&tranNo=` | 쿼리 파라미터 | 200 `SaleResDto` | 400, 404 |
-| 8 | `POST /api/checkout` | `PaymentReqDto` | 200 `SaleResDto` (Q8) | 400, 409 `DUPLICATE_TRANSACTION` |
-| 9 | `POST /api/checkout/transaction/refund` | `RefundReqDto` | 200 `SaleResDto` | 400, 404, 409 `ALREADY_REFUNDED` |
+| # | 목표 메서드·경로 (Q6, Q11) | 지금 경로 | 요청 | 성공 응답 (Q2, Q5) | 실패 |
+|---|---|---|---|---|---|
+| 1 | `GET /api/carts?strCd=&posNo=&tranNo=` | `GET /api/cart/item` | 쿼리 파라미터 | 200 `CartResDto` | 400 |
+| 2 | `POST /api/carts/lines` | `POST /api/cart/item/add` | `ProductReqDto` | 200 `CartResDto` (담은 뒤 카트) | 400, 404 `PRODUCT_NOT_FOUND`, 409 `PRODUCT_DISCONTINUED` |
+| 3 | `POST /api/carts/lines/batch` | `POST /api/cart/item/add/many` | `List<ProductReqDto>` | 200 `CartResDto` | 2와 같음. **전부 아니면 전무** (Q4) |
+| 4 | `PATCH /api/carts/lines` | `POST /api/cart/item/update/qty` | `UpdateQtyReqDto` (`qty` 필수, ≥ 1) | 200 `CartResDto` | 400, 404 `CART_LINE_NOT_FOUND` |
+| 5 | `POST /api/carts/lines/cancel` | `POST /api/cart/item/cancel` | `ProductReqDto` | 200 `CartResDto` | 400, 404 `CART_LINE_NOT_FOUND` |
+| 6 | `GET /api/carts/summary?strCd=&posNo=&tranNo=` | `GET /api/checkout/{posNo}/{tranNo}/summary` | 쿼리 파라미터 | 200 `CartSummaryResDto` | 400 |
+| 7 | `GET /api/sales?strCd=&posNo=&tranNo=` | `GET /api/checkout/transaction/call` | 쿼리 파라미터 | 200 `SaleResDto` | 400, 404 |
+| 8 | `POST /api/sales` | `POST /api/checkout` | `PaymentReqDto` | 200 `SaleResDto` (Q8) | 400, 409 `DUPLICATE_TRANSACTION` |
+| 9 | `POST /api/sales/refunds` | `POST /api/checkout/transaction/refund` | `RefundReqDto` | 200 `SaleResDto` | 400, 404, 409 `ALREADY_REFUNDED` |
+| — | `/api/products` (키오스크 단계에서 메뉴 목록 등 추가) | `/api/product` (빈 컨트롤러) | — | — | — |
+
+- 경로 규칙 (Q11): 자원 이름은 복수형 명사(`carts`, `sales`, `products`), 동작은 HTTP 메서드로 표현. 메서드로 표현할 수 없는 동작만 하위 경로(`/batch`, `/cancel`, `/refunds`)
+- 거래 키(`strCd`·`posNo`·`tranNo`)는 경로에 넣지 않고 GET은 쿼리 파라미터, 나머지는 바디로 받는다 (Q6). 경로에 넣으면 `/api/stores/{strCd}/pos/{posNo}/carts/{tranNo}/lines`처럼 길어지고 바디의 키와 중복됨
+- 취소를 `DELETE`로 하지 않는 이유: 라인을 지우는 게 아니라 `CANCELLED` 상태로 남기고(영수증·저널에 기록), 요청에 바디(키·바코드)가 필요하기 때문
+- 결제는 "판매를 만든다"는 의미라 `POST /api/sales`. 반품도 새 판매(반품 거래)를 만드므로 `POST /api/sales/refunds`
 
 `CartResDto` (A5, 신규): 키 이름을 `SaleResDto.cart`(`CartSummaryResDto`)와 맞춘다
 
@@ -252,15 +259,37 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 - 영향 파일: `controller/CartController.java`, `service/*/CartService*.java`, 삭제 `domain/dto/response/ApiResponseDto.java`, 테스트 4~5개 파일
 - 위험도: 중
 
-### A1·A2 — GET 바디 제거
+### A1·A2·A8 — 경로 재설계와 GET 바디 제거 (Q11)
 
-**`feat(api): 조회 API를 쿼리 파라미터 방식으로 변경`**
-- `GET /api/cart/item`, `GET /api/checkout/transaction/call`: `@RequestBody CartInfoReqDto` → `@ModelAttribute @Valid CartInfoReqDto` (쿼리 `strCd`·`posNo`·`tranNo`)
-  - `CartInfoReqDto`는 final 필드 + 생성자라 Spring 6의 생성자 바인딩으로 받을 수 있음 — X2에서 확인됨 (누락 시 `MethodArgumentNotValidException`)
-- 요약 API (A2): `GET /api/checkout/{posNo}/{tranNo}/summary` → `GET /api/checkout/summary?strCd=&posNo=&tranNo=` (Q6). 서비스 `getSaleSummary(PaymentReqDto)` → `getSaleSummary(CartKey)`
-  - **바뀌는 테스트**: `PosApiTestSupport.getCart`·`callTransaction` 헬퍼 2개 (호출부 18곳·5곳은 그대로), `CheckoutEdge.summary_ignoresPathVariables` → `summary_usesQueryParameters`, 신규: 쿼리 파라미터 누락 → 400
-- 영향 파일: `controller/*.java`, `service/*/CheckoutService*.java`, `PosApiTestSupport`, `CheckoutEdgeIntegrationTest`
-- 위험도: 하 (헬퍼에 모여 있음)
+**`feat(api): API 경로를 자원 단위로 재설계하고 조회를 쿼리 파라미터로 변경`**
+- 경로와 요청 방식은 "엔드포인트 주소"라는 한 가지 계약이라 커밋 하나로 묶는다 (A1·A2: GET 바디 제거, A8: 경로 재설계)
+- 경로: 2.3절 표대로
+  - `CartController`: `@RequestMapping("/api/carts")`. 담기 `POST /lines`, 일괄 `POST /lines/batch`, 수량 `PATCH /lines`, 취소 `POST /lines/cancel`, 조회 `GET`, 요약 `GET /summary`
+  - 요약 API는 장바구니 조회라 `CheckoutController`에서 **`CartController`로 옮긴다**. 서비스는 `getSaleSummary(PaymentReqDto)` → `CartService`의 요약 메서드(`CartKey`를 받음)로 이동
+  - `CheckoutController`: `@RequestMapping("/api/sales")`. 결제 `POST`, 조회 `GET`, 반품 `POST /refunds`
+  - `ProductController`: `@RequestMapping("/api/products")` (엔드포인트는 아직 없음)
+  - 컨트롤러 클래스 이름은 이번 커밋에서 바꾸지 않는다 — 이름 변경은 동작이 같은 refactor라 바로 다음 A8-1에서 별도 커밋
+- GET 바디 제거: `@RequestBody CartInfoReqDto` → `@ModelAttribute @Valid CartInfoReqDto` (쿼리 `strCd`·`posNo`·`tranNo`). X2에서 생성자 바인딩 확인됨 (누락 시 `MethodArgumentNotValidException` → 400)
+- 옛 경로는 남기지 않는다 (클라이언트가 아직 없음). 옛 경로로 요청하면 Spring 기본 404
+- **바뀌는 테스트**
+  - `PosApiTestSupport` 헬퍼 8개의 경로·메서드 (`getCart`, `addItem`, `addItems`, `updateQty`(→ `patch`), `cancelItem`, `checkoutCash`, `callTransaction`, `refund`). 헬퍼를 쓰는 호출부는 그대로
+  - 경로를 직접 쓰는 5곳: `CheckoutEdge`(카드 결제 :88, 요약 :150), `CartIntegrationTest`(수량 누락 :134, 다른 점포 담기 :200), `CheckoutScenario`(사유 없는 반품 :264)
+  - `CheckoutEdge.summary_ignoresPathVariables` → `summary_usesQueryParameters`
+  - 신규: 쿼리 파라미터 누락 → 400, 옛 경로(`/api/cart/item/add`) → 404
+- 영향 파일: `controller/*.java`, `service/*/CartService*.java`, `service/*/CheckoutService*.java`, `PosApiTestSupport`, 통합 테스트 3개
+- 위험도: 중 (경로를 쓰는 곳이 헬퍼와 5곳에 모여 있어 범위는 명확함)
+
+### A8-1 — 컨트롤러 이름을 경로 자원에 맞춤 (refactor)
+
+**`refactor: 판매 컨트롤러 이름을 경로에 맞게 변경`**
+- `controller/CheckoutController.java` → `SaleController.java` (A1·A2·A8 이후 `/api/sales`만 담당)
+- 그대로 두는 것
+  - `CartController`(`/api/carts`), `ProductController`(`/api/products`): 이미 경로와 이름이 맞음
+  - 경로 이름 `lines`: 도메인 `CartLine`, DB `SALE_LINES`, 응답 JSON `lines`와 같은 단어라 유지 (2026-11-15 결정 — `items` 등으로 바꾸면 경로만 다른 이름이 됨)
+  - 서비스 이름 `CheckoutService`/`CheckoutServiceImpl`: "결제·반품"이라는 유스케이스 이름이라 유지. 바꾸면 영향 범위가 커지고 동작상 이득이 없음
+  - 테스트 클래스 이름(`CheckoutEdgeIntegrationTest`, `CheckoutScenarioIntegrationTest`): 컨트롤러가 아니라 결제 시나리오를 검사하므로 유지
+- 동작 변경 없음: 경로·응답 그대로, 테스트 변경 0건이어야 함 (클래스를 직접 참조하는 테스트 없음)
+- 위험도: 하
 
 ### A7 — 현금이 아닐 때 `payment.cash` = null
 
@@ -288,7 +317,7 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 
 ## 5. 결정 사항
 
-> Q1~Q10 모두 **권장안으로 확정** (사용자 승인). 아래 "결정" 열이 확정된 내용이다.
+> Q1~Q10은 **권장안으로 확정**, Q11은 확장 방향(`docs/expansion-notes.md`)을 검토한 뒤 추가로 결정 (사용자 승인). 아래 "결정" 열이 확정된 내용이다.
 
 | # | 질문 | 결정 | 영향 |
 |---|---|---|---|
@@ -297,11 +326,12 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 | Q3 | 업무 규칙 위반의 HTTP 상태 | **400(요청 값) / 404(대상 없음) / 409(상태 충돌)** 세 가지만. 카드 결제는 **400** | A4 |
 | Q4 | 일괄 담기 중 한 건이 실패하면 | **전부 아니면 전무** — 먼저 전부 검사, 하나라도 실패하면 아무것도 안 담고 404/409. 빈 목록은 400 | A4, A6 |
 | Q5 | 장바구니 변경(담기·수량·취소) 성공 응답 | **변경 후 카트(`CartResDto`)** — POS 화면이 바로 다시 그릴 수 있음 | A3 |
-| Q6 | GET 조회의 키 전달 방식 | **쿼리 파라미터** (`?strCd=&posNo=&tranNo=`), 요약 API 경로도 `/api/checkout/summary`로 맞춤 | A1·A2 |
+| Q6 | GET 조회의 키 전달 방식 | **쿼리 파라미터** (`?strCd=&posNo=&tranNo=`). 요약 API 경로는 Q11에 따라 `/api/carts/summary` | A1·A2·A8 |
 | Q7 | API 변경 커밋 타입 | **`feat(api): ...`**, 본문 첫 줄에 `- API 변경: <무엇이 어떻게>` (CLAUDE.md 타입 목록 안에서 고름) | 전체 |
 | Q8 | 결제·반품 성공 상태 | **200 유지** (201 Created는 `Location` 헤더 설계까지 필요) | A3 |
 | Q9 | 현금 결제에서 `amountReceived` 누락 | **400 `VALIDATION_FAILED`** — 지금은 NPE(500). 현금일 때만 필수라 클래스 수준 제약 또는 서비스 검사로 구현 | A6 |
 | Q10 | A7을 지금 할지 | **지금 함** (작고 독립적, 카드 구현 때 잊지 않게) | A7 |
+| Q11 | URL 구조 | **자원 단위로 재설계 (B안)** — `/api/carts`, `/api/sales`, `/api/products`. 키오스크(선불, 같은 API를 UI만 다르게)와 ERP 조회 API가 붙을 것을 고려해, 이번 API 변경에서 경로를 한 번에 정리 (2026-11-15 추가 결정). 대안이었던 "기존 경로 유지"는 동사가 섞인 경로(`/item/update/qty`, `/transaction/call`)가 남아 채택하지 않음 | A1·A2·A8 |
 
 ## 6. 진행 규칙
 
@@ -313,7 +343,7 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 4. 커밋: API 변경은 `feat(api)`, refactor·fix와 섞지 않음. 커밋 전에 메시지·파일 확인 (배치 단위로 한 번에 승인)
 5. 배치마다 7장(진행 현황)에 기록하는 `docs` 커밋
 
-배치 묶음 제안: **배치 A = A0-0, A0-1, A0-2, A4** (정리 + 오류 계약) → **배치 B = A6, A5** → **배치 C = A3, A1·A2, A7, 문서**. 배치 A가 테스트 변경이 가장 많고 위험도가 높다.
+배치 묶음 제안: **배치 A = A0-0, A0-1, A0-2, A4** (정리 + 오류 계약) → **배치 B = A6, A5** → **배치 C = A3, A1·A2·A8, A8-1(컨트롤러 이름, refactor), A7, 문서**. 배치 A가 테스트 변경이 가장 많고 위험도가 높다.
 
 ## 7. 진행 현황
 
@@ -349,5 +379,5 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 | A4 처리기 | `MethodArgumentNotValidException`(단건 바디·쿼리)과 **`jakarta.validation.ConstraintViolationException`(목록 바디)** 둘 다 400 `VALIDATION_FAILED`로 매핑. `HttpMessageNotReadableException` → 400 `MALFORMED_REQUEST` |
 | A6 `errors[].field` | **JSON 필드 이름으로 정규화**: `@JsonUnwrapped` 필드 접두사(`cartInfoReqDto.`) 제거, 목록은 메서드·파라미터 접두사(`addToCart.productReqDtoList`) 제거 후 `[1].barcode` 형태 |
 | A6 메시지 | 모든 제약에 한국어 `message` 지정 (예: `@NotBlank(message = "거래번호는 필수입니다")`) |
-| A1·A2 | 계획대로 `@ModelAttribute @Valid CartInfoReqDto` 사용 (대안 `@RequestParam` 불필요) |
+| A1·A2·A8 | 계획대로 `@ModelAttribute @Valid CartInfoReqDto` 사용 (대안 `@RequestParam` 불필요) |
 | X3 | 테스트는 `jsonPath("$.code")`로 검사 (계획대로) |
