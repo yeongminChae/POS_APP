@@ -1,6 +1,6 @@
 # API 변경 계획
 
-> **상태: 배치 A·B 완료 (`43cf907` ~ `38cc9fa`), 테스트 59개 통과·스킵 0.** 다음 작업은 배치 C의 A3부터. 3장의 라인 번호는 `36c3353` 기준이라 배치 A·B 이후 일부 어긋난다.
+> **상태: 완료.** 배치 A·B·C 전부 반영 (`43cf907` ~ `5855623`), 테스트 63개 통과·스킵 0. 결과 명세는 [api.md](api.md). 3장의 라인 번호·경로는 계획 당시(`36c3353`) 기준이다.
 
 > 기준 커밋: `36c3353` (버그 수정 단계 완료, 테스트 46개 통과·스킵 0). 이 문서를 쓰는 동안 코드는 수정하지 않았다.
 > API 변경 ID(A1~A7)는 `docs/architecture.md` 3.3절 기준. 보류해 둔 B11·B13과 빈 TODO(L2)는 이 단계에서 함께 처리한다.
@@ -355,6 +355,11 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 | 4 | A | A4 전역 예외 처리기 | `62e9777` | 기존 테스트 17개 기대값 변경, 신규 `ErrorResponseIntegrationTest` 2개 |
 | 5 | B | A6 요청 검증 (+B13, L2) | `eae2b03` | 기존 테스트 2개 기대값 변경, 신규 `RequestValidationIntegrationTest` 10개 |
 | 6 | B | A5 장바구니·요약 응답 DTO | `38cc9fa` | 키 이름 치환(4개 파일), `getCart_exposesInternals` → `getCart_hidesInternals`, 신규 1개 |
+| 7 | C | A3 성공 응답 형식 통일 | `fa8f59f` | `.asBoolean()`·바디 `status` → HTTP 상태 + 카트 내용, `CartServiceImplTest` 반환값 |
+| 8 | C | A1·A2·A8 경로 재설계·GET 쿼리 파라미터 | `db3097d` | 테스트 경로 상수화, `summary_ignoresPathVariables` → `summary_usesQueryParameters`, 신규 2개 |
+| 9 | C | A8-1 `CheckoutController` → `SaleController` | `9862974` | refactor, 테스트 변경 없음 |
+| 10 | C | A7 현금 외 결제의 `payment.cash` = null | `a783dd4` | 신규 `PaymentResDtoTest` 2개 |
+| 11 | C | 문서 (`docs/api.md`, CLAUDE.md) | `5855623` | — |
 
 ### 배치 A 메모
 
@@ -394,6 +399,26 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
   - 바뀐 테스트: `linesList`·`totalQtyInLines`·`totalAmountInLines` 키 치환(Cart·CheckoutEdge·CheckoutScenario·Concurrent), `getCart_hidesInternals`. `summary_ignoresPathVariables`는 계획대로 그대로 통과
   - 빨간 상태 확인: 18개 실패 (새 키 없음)
 - 계획에 없는 기대값 변경: **없음**
+
+### 배치 C 메모
+
+- 테스트: 59개 → **63개**(스킵 0). 늘어난 4개는 조회 API 쿼리 파라미터 누락(`query_withoutTranNo_returns400`), 옛 경로 404(`oldPaths_return404`), `PaymentResDtoTest` 2개
+- **A3**
+  - 담기·일괄 담기·수량 변경·취소 → 200 + `CartResDto`. 서비스 4개 메서드가 `Cart`를 돌려주고 컨트롤러가 변환. `ApiResponseDto` 삭제
+  - 수량 변경·취소 실패 → 신규 `CartLineNotFoundException`(404 `CART_LINE_NOT_FOUND`, "장바구니에 없는 상품입니다. barcode=…"). 도메인 `boolean`은 그대로
+  - **계획에 없던 결정**: 일괄 담기 응답은 첫 요청 키의 장바구니 (요청마다 키가 있지만 한 장바구니에 담는 API). 서비스의 `qty ≤ 0`은 `false` 대신 `IllegalArgumentException`(500) — HTTP 요청은 검증(400)에서 먼저 막혀 잘못된 내부 호출에서만 발생
+  - 테스트 헬퍼 `ok(result)` 추가 (HTTP 200 확인 + 바디 반환)
+  - 빨간 상태 확인: 6개 실패 (옛 바디, 실패도 200)
+- **A1·A2·A8**
+  - `CartController` `/api/carts`(조회 GET, 요약 GET `/summary`, 담기 POST `/lines`, 일괄 POST `/lines/batch`, 수량 PATCH `/lines`, 취소 POST `/lines/cancel`), `CheckoutController` `/api/sales`(조회 GET, 결제 POST, 반품 POST `/refunds`), `ProductController` `/api/products`
+  - GET은 `@Valid @ModelAttribute CartInfoReqDto` (X2대로 생성자 바인딩). 요약은 `CartService.getCartSummary(CartKey)`로 옮기고 `CheckoutService.getSaleSummary` 삭제 → 배치 B에서 미뤄 둔 요약 API 키 검증도 해결
+  - 테스트: 경로를 `PosApiTestSupport` 상수(`CARTS`, `CART_LINES` …)와 `query()`·`getSummary()` 헬퍼로 모음. 계획의 "직접 경로 5곳"보다 많이 바뀐 것은 배치 A·B에서 추가한 테스트도 경로를 쓰기 때문 (기대값 변경은 아님)
+  - 옛 경로는 Spring 기본 404 (`code` 없음)
+  - 빨간 상태 확인: 52개 실패 (새 경로 404, 옛 경로 200)
+- **A8-1**: 파일·클래스 이름만 변경. 테스트 변경 0건
+- **A7**: `PaymentResDto.of`에서 `CashPayment`일 때만 `CashPayloadDto`. 빨간 이유 — 가짜 카드 `Payment`에서 거스름돈 계산 NPE
+- **문서**: 신규 `docs/api.md`, CLAUDE.md "API 규칙" 절, architecture.md 3.3절 완료 표시
+- 계획에 없는 기대값 변경: **없음** (위 결정 2건은 HTTP 계약에 드러나지 않거나 계획에 정하지 않은 부분)
 
 ## 8. 사전 확인 기록
 
