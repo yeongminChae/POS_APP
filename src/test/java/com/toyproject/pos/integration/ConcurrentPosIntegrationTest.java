@@ -152,7 +152,7 @@ class ConcurrentPosIntegrationTest extends PosApiTestSupport {
         for (int t = 0; t < threads; t++) {
             String posNo = String.format("%02d", t + 1);
             for (String tranNo : tranNos.get(t)) {
-                JsonNode lines = json(getCart(posNo, tranNo)).get("linesList");
+                JsonNode lines = json(getCart(posNo, tranNo)).get("lines");
                 assertThat(lines).hasSize(1);
                 assertThat(lines.get(0).get("qty").asInt()).isEqualTo(1);
             }

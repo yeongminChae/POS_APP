@@ -24,7 +24,7 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
         assertThat(err.get("detail").asText()).isEqualTo("받은 금액이 결제 금액보다 적습니다.");
 
         assertThat(countSales(POS_1, tranNo)).isZero();
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).hasSize(1);
+        assertThat(json(getCart(POS_1, tranNo)).get("lines")).hasSize(1);
     }
 
     @Test
@@ -81,7 +81,7 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
                 400, "UNSUPPORTED_PAYMENT_METHOD");
 
         assertThat(countSales(POS_1, tranNo)).isZero();
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).hasSize(1);
+        assertThat(json(getCart(POS_1, tranNo)).get("lines")).hasSize(1);
     }
 
     @Test
@@ -113,7 +113,7 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
         assertThat(err.get("detail").asText()).isEqualTo("이미 결제된 거래번호입니다.");
 
         assertThat(countSales(POS_1, tranNo)).isEqualTo(1);
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).hasSize(1); // 롤백되어 카트 유지
+        assertThat(json(getCart(POS_1, tranNo)).get("lines")).hasSize(1); // 롤백되어 카트 유지
     }
 
     @Test
@@ -140,6 +140,20 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
 
         assertThat(summary.get("tranNo").asText()).isEqualTo(tranNo);
         assertThat(amt(summary.get("totalAmount"))).isEqualByComparingTo("1500");
+    }
+
+    @Test
+    @DisplayName("결제 요약 응답은 CartSummaryResDto — 거래 키를 담고, 라인 productId 는 내보내지 않는다")
+    void summary_returnsSummaryDto() throws Exception {
+        String tranNo = newTranNo();
+        addItem(POS_1, tranNo, CHIPS);
+
+        JsonNode summary = json(perform(get("/api/checkout/{posNo}/{tranNo}/summary", POS_1, tranNo), key(POS_1, tranNo)));
+
+        assertThat(summary.fieldNames()).toIterable()
+                .containsExactlyInAnyOrder("strCd", "posNo", "tranNo", "totalQty", "totalAmount", "lines");
+        assertThat(summary.at("/lines/0").has("productId")).isFalse();
+        assertThat(summary.at("/lines/0/barcode").asText()).isEqualTo(CHIPS);
     }
 
     @Test

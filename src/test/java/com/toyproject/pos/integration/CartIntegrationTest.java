@@ -22,7 +22,7 @@ class CartIntegrationTest extends PosApiTestSupport {
         JsonNode res = json(addItem(POS_1, tranNo, ADULT_SOJU));
 
         assertThat(res.get("status").asInt()).isEqualTo(200);
-        assertThat(json(getCart(POS_1, tranNo)).at("/linesList/0/barcode").asText()).isEqualTo(ADULT_SOJU);
+        assertThat(json(getCart(POS_1, tranNo)).at("/lines/0/barcode").asText()).isEqualTo(ADULT_SOJU);
     }
 
     @Test
@@ -32,7 +32,7 @@ class CartIntegrationTest extends PosApiTestSupport {
 
         error(addItem(POS_1, tranNo, DISCONTINUED), 409, "PRODUCT_DISCONTINUED");
 
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
+        assertThat(json(getCart(POS_1, tranNo)).get("lines")).isEmpty();
         assertThat(stock("P010")).isZero();
     }
 
@@ -89,7 +89,7 @@ class CartIntegrationTest extends PosApiTestSupport {
         JsonNode err = error(addItem(POS_1, tranNo, UNKNOWN), 404, "PRODUCT_NOT_FOUND");
 
         assertThat(err.get("detail").asText()).isEqualTo("상품을 찾을 수 없습니다. barcode=" + UNKNOWN);
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
+        assertThat(json(getCart(POS_1, tranNo)).get("lines")).isEmpty();
     }
 
     @Test
@@ -99,7 +99,7 @@ class CartIntegrationTest extends PosApiTestSupport {
 
         error(addItems(POS_1, tranNo, CHIPS, UNKNOWN, CHOCO), 404, "PRODUCT_NOT_FOUND");
 
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
+        assertThat(json(getCart(POS_1, tranNo)).get("lines")).isEmpty();
     }
 
     // ===== 수량 변경 / 취소 =====
@@ -119,7 +119,7 @@ class CartIntegrationTest extends PosApiTestSupport {
         }
         assertThat(json(updateQty(POS_1, tranNo, COOKIE, 2)).asBoolean()).isFalse();
         assertThat(json(updateQty(POS_1, tranNo, CHOCO, 2)).asBoolean()).isFalse();
-        assertThat(json(getCart(POS_1, tranNo)).at("/linesList/0/qty").asInt()).isEqualTo(1);
+        assertThat(json(getCart(POS_1, tranNo)).at("/lines/0/qty").asInt()).isEqualTo(1);
     }
 
     @Test
@@ -134,7 +134,7 @@ class CartIntegrationTest extends PosApiTestSupport {
         assertThat(err.get("detail").asText()).isEqualTo("요청 값이 올바르지 않습니다.");
         assertThat(err.at("/errors/0/field").asText()).isEqualTo("qty");
         assertThat(err.at("/errors/0/message").asText()).isEqualTo("수량은 필수입니다");
-        assertThat(json(getCart(POS_1, tranNo)).at("/linesList/0/qty").asInt()).isEqualTo(1);
+        assertThat(json(getCart(POS_1, tranNo)).at("/lines/0/qty").asInt()).isEqualTo(1);
     }
 
     @Test
@@ -149,21 +149,26 @@ class CartIntegrationTest extends PosApiTestSupport {
 
         addItem(POS_1, tranNo, CHOCO);
 
-        JsonNode lines = json(getCart(POS_1, tranNo)).get("linesList");
+        JsonNode lines = json(getCart(POS_1, tranNo)).get("lines");
         assertThat(lines).extracting(l -> l.get("lineId").asText()).containsExactly("0001", "0002");
         assertThat(lines).extracting(l -> l.get("itemStatus").asText()).containsExactly("CANCELLED", "NORMAL");
     }
 
     @Test
-    @DisplayName("[현재 동작] 장바구니 조회 응답에 내부 필드(barcodeToLineMap, seq)가 노출된다")
-    void getCart_exposesInternals() throws Exception {
+    @DisplayName("장바구니 조회 응답은 CartResDto — 내부 필드(barcodeToLineMap, seq, 라인 productId)를 내보내지 않는다")
+    void getCart_hidesInternals() throws Exception {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
 
         JsonNode cart = json(getCart(POS_1, tranNo));
 
-        assertThat(cart.get("barcodeToLineMap").get(CHIPS).asText()).isEqualTo("0001");
-        assertThat(cart.get("seq").asInt()).isEqualTo(1);
+        assertThat(cart.fieldNames()).toIterable()
+                .containsExactlyInAnyOrder("strCd", "posNo", "tranNo", "totalQty", "totalAmount", "lines");
+        assertThat(cart.at("/lines/0").fieldNames()).toIterable()
+                .containsExactlyInAnyOrder("lineId", "barcode", "name", "unitPrice", "qty", "amount", "itemStatus");
+        assertThat(cart.get("tranNo").asText()).isEqualTo(tranNo);
+        assertThat(cart.get("totalQty").asInt()).isEqualTo(1);
+        assertThat(amt(cart.get("totalAmount"))).isEqualByComparingTo("1500");
     }
 
     // ===== 거래 키 =====
@@ -177,7 +182,7 @@ class CartIntegrationTest extends PosApiTestSupport {
 
         JsonNode pos2Cart = json(getCart(POS_2, tranNo));
         assertThat(pos2Cart.get("posNo").asText()).isEqualTo(POS_2);
-        assertThat(pos2Cart.get("linesList"))
+        assertThat(pos2Cart.get("lines"))
                 .extracting(l -> l.get("barcode").asText())
                 .containsExactly(CHOCO);
 
@@ -187,7 +192,7 @@ class CartIntegrationTest extends PosApiTestSupport {
         assertThat(countSales(POS_1, tranNo)).isZero();
 
         // POS 01 의 장바구니는 그대로 남음
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList"))
+        assertThat(json(getCart(POS_1, tranNo)).get("lines"))
                 .extracting(l -> l.get("barcode").asText())
                 .containsExactly(CHIPS);
     }
@@ -203,7 +208,7 @@ class CartIntegrationTest extends PosApiTestSupport {
 
         JsonNode cart = json(getCart(POS_1, tranNo));
         assertThat(cart.get("strCd").asText()).isEqualTo(STORE);
-        assertThat(cart.get("linesList"))
+        assertThat(cart.get("lines"))
                 .extracting(l -> l.get("barcode").asText())
                 .containsExactly(CHIPS);
     }

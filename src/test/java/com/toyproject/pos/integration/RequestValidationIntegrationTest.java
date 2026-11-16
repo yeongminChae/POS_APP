@@ -38,7 +38,7 @@ class RequestValidationIntegrationTest extends PosApiTestSupport {
         JsonNode err = error(addItem(POS_1, tranNo, " "), 400, "VALIDATION_FAILED");
 
         assertThat(errors(err)).containsExactly("barcode: 바코드는 필수입니다");
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
+        assertThat(json(getCart(POS_1, tranNo)).get("lines")).isEmpty();
     }
 
     @Test
@@ -51,7 +51,7 @@ class RequestValidationIntegrationTest extends PosApiTestSupport {
                 List.of(with(key(POS_1, tranNo), "barcode", CHIPS), missing)), 400, "VALIDATION_FAILED");
 
         assertThat(errors(err)).containsExactly("[1].barcode: 바코드는 필수입니다");
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
+        assertThat(json(getCart(POS_1, tranNo)).get("lines")).isEmpty();
     }
 
     @Test

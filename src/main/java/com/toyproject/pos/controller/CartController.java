@@ -1,10 +1,10 @@
 package com.toyproject.pos.controller;
 
+import com.toyproject.pos.domain.dto.cart.CartResDto;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.product.request.ProductReqDto;
 import com.toyproject.pos.domain.dto.product.request.UpdateQtyReqDto;
 import com.toyproject.pos.domain.dto.response.ApiResponseDto;
-import com.toyproject.pos.domain.model.cart.Cart;
 import com.toyproject.pos.service.interfaces.CartService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -25,8 +25,8 @@ public class CartController {
     private final CartService cartService;
 
     @GetMapping("/item")
-    public Cart getCurrentCart(@Valid @RequestBody CartInfoReqDto cartInfoReqDto) {
-        return cartService.getCurrentCart(cartInfoReqDto);
+    public CartResDto getCurrentCart(@Valid @RequestBody CartInfoReqDto cartInfoReqDto) {
+        return CartResDto.of(cartService.getCurrentCart(cartInfoReqDto));
     }
 
     // 상품 조회 및 데이터 저장

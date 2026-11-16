@@ -23,8 +23,8 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
 
         // 1) 거래 시작 — 별도 API 없음. 장바구니 조회 시 빈 카트가 생성된다.
         JsonNode empty = json(getCart(POS_1, tranNo));
-        assertThat(empty.get("linesList")).isEmpty();
-        assertThat(amt(empty.get("totalAmountInLines"))).isEqualByComparingTo("0");
+        assertThat(empty.get("lines")).isEmpty();
+        assertThat(amt(empty.get("totalAmount"))).isEqualByComparingTo("0");
 
         // 2) 상품 담기 — 같은 바코드 재스캔은 수량 증가
         assertThat(json(addItem(POS_1, tranNo, CHIPS)).get("status").asInt()).isEqualTo(200);
@@ -39,13 +39,13 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
         assertThat(json(cancelItem(POS_1, tranNo, CHOCO)).asBoolean()).isTrue();
 
         JsonNode cart = json(getCart(POS_1, tranNo));
-        JsonNode lines = cart.get("linesList");
+        JsonNode lines = cart.get("lines");
         assertThat(lines).hasSize(3);
         assertLine(lines.get(0), "0001", CHIPS, 2, "3000", "NORMAL");
         assertLine(lines.get(1), "0002", CHOCO, 1, "0", "CANCELLED"); // [현재 동작] 취소 라인은 수량 유지, 금액만 0
         assertLine(lines.get(2), "0003", COOKIE, 3, "7500", "NORMAL");
-        assertThat(cart.get("totalQtyInLines").asInt()).isEqualTo(5);
-        assertThat(amt(cart.get("totalAmountInLines"))).isEqualByComparingTo("10500");
+        assertThat(cart.get("totalQty").asInt()).isEqualTo(5);
+        assertThat(amt(cart.get("totalAmount"))).isEqualByComparingTo("10500");
 
         // 5) 현금 결제
         JsonNode sale = json(checkoutCash(POS_1, tranNo, 20000));
@@ -92,7 +92,7 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
         assertThat(trJson.at("/cartSummary/lines")).hasSize(3);
 
         // 5-2) 커밋 후 인메모리 장바구니 비워짐 (같은 키로 조회하면 새 빈 카트)
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
+        assertThat(json(getCart(POS_1, tranNo)).get("lines")).isEmpty();
 
         // 6) 거래 조회 — DB 에서 재구성
         JsonNode called = json(callTransaction(POS_1, tranNo));
