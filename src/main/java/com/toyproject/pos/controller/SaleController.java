@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/sales")
 @Validated
 @RequiredArgsConstructor
-public class CheckoutController {
+public class SaleController {
 
     private final CheckoutService checkoutService;
 
