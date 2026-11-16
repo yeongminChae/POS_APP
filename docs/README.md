@@ -1,6 +1,6 @@
 # 문서 안내
 
-> 마지막 갱신: 2026-11-15, `9f80acc` 기준 (테스트 46개 통과, 스킵 0)
+> 마지막 갱신: 2026-11-16, `38cc9fa` 기준 (테스트 59개 통과, 스킵 0)
 
 ## 지금 어디까지 왔나
 
@@ -8,18 +8,16 @@
 |---|---|---|---|
 | 1. 리팩토링 (동작 변경 없음) | [architecture.md](architecture.md) | ✅ 완료 — R1~R12 + 잔여 정리 2건 | `6df59ec` ~ `f858f26` |
 | 2. 버그 수정 | [bugfix-plan.md](bugfix-plan.md) | ✅ 완료 — 배치 1~5 (B1~B10, B12a·b, B14a, B15, B16, N1~N5) | `6fe8514` ~ `36c3353` |
-| 3. API 변경 | [api-change-plan.md](api-change-plan.md) | 📝 계획 완료, **구현 전** — 결정 Q1~Q11(경로를 자원 단위로 재설계 포함), 사전 확인 X1~X3 끝 | `2e59437` ~ (문서만) |
+| 3. API 변경 | [api-change-plan.md](api-change-plan.md) | 🚧 진행 중 — 배치 A(A0-0~A0-2, A4)·배치 B(A6, A5) 완료, 배치 C 남음 | `2e59437` ~ `38cc9fa` |
 | 4. 카페 키오스크 (선불) → 데이터 보강 → ERP | [expansion-notes.md](expansion-notes.md) | 💭 방향 메모만 — 시작할 때 계획 문서를 따로 만듦 | — |
 
-**다음 작업**: API 변경 배치 A — A0-0 남은 주석·중복 코드 정리 → A0-1 전용 예외 클래스 → A0-2 B11(거래번호 재사용) → A4 전역 예외 처리기 ([api-change-plan.md](api-change-plan.md) 3장, 6장).
+**다음 작업**: API 변경 배치 C — A3 성공 응답 통일 → A1·A2·A8 경로 재설계·GET 바디 제거 → A8-1 컨트롤러 이름 → A7 → 문서 ([api-change-plan.md](api-change-plan.md) 3장, 7장).
 
 ## 남은 것 한눈에
 
 | 구분 | 항목 | 어디서 처리 |
 |---|---|---|
-| API 변경 | GET 바디(A1·A2), 경로 재설계(A8), 오류가 전부 500(A4), 요청 검증 없음(A6), 응답 형식 혼재(A3·A5), 현금 아닌 결제의 cash 블록(A7) | api-change-plan.md |
-| API 단계로 넘긴 버그 | B11 거래번호 재사용 → A0-2·A4, B13 수량 누락 NPE·빈 TODO(L2) → A6 | api-change-plan.md |
-| 잔여 정리 | 주석 처리된 매퍼·서비스 코드, `withOriginSaleId` 중복 호출 | api-change-plan.md A0-0 |
+| API 변경 | GET 바디(A1·A2), 경로 재설계(A8), 담기·수량·취소 응답 형식 혼재(A3), 현금 아닌 결제의 cash 블록(A7) | api-change-plan.md 배치 C |
 | 보류 (설계·정책 필요) | B12c 성인 인증, B14b 계산원(`"테스터"`), B12d 재고 부족 차단(정책상 안 함), B17 enum ↔ CHECK, T2 조회 트랜잭션, L5 결제 수단별 저장 정책 | bugfix-plan.md 1.3절, 7장 "버그 수정 단계 마무리" |
 
 ## 문서별 내용

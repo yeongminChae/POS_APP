@@ -1,6 +1,6 @@
 # API 변경 계획
 
-> **상태: 계획 완료, 구현 전.** 결정(Q1~Q11, 5장)·사전 확인(X1~X3, 8장) 끝. 다음 작업은 배치 A의 A0-0부터. `36c3353` 이후 커밋은 문서뿐이라 코드·라인 번호는 그대로 유효하다 (`f31dc92` 기준 확인).
+> **상태: 배치 A·B 완료 (`43cf907` ~ `38cc9fa`), 테스트 59개 통과·스킵 0.** 다음 작업은 배치 C의 A3부터. 3장의 라인 번호는 `36c3353` 기준이라 배치 A·B 이후 일부 어긋난다.
 
 > 기준 커밋: `36c3353` (버그 수정 단계 완료, 테스트 46개 통과·스킵 0). 이 문서를 쓰는 동안 코드는 수정하지 않았다.
 > API 변경 ID(A1~A7)는 `docs/architecture.md` 3.3절 기준. 보류해 둔 B11·B13과 빈 TODO(L2)는 이 단계에서 함께 처리한다.
@@ -353,6 +353,8 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 | 2 | A | A0-1 전용 예외 클래스 | `b1313ef` | refactor, 테스트 변경 없음 |
 | 3 | A | A0-2 B11 거래번호 재사용 거절 | `59194fe` | `reuseTranNoAfterCheckout_violatesUnique` → `reuseTranNoAfterCheckout_isRejected` |
 | 4 | A | A4 전역 예외 처리기 | `62e9777` | 기존 테스트 17개 기대값 변경, 신규 `ErrorResponseIntegrationTest` 2개 |
+| 5 | B | A6 요청 검증 (+B13, L2) | `eae2b03` | 기존 테스트 2개 기대값 변경, 신규 `RequestValidationIntegrationTest` 10개 |
+| 6 | B | A5 장바구니·요약 응답 DTO | `38cc9fa` | 키 이름 치환(4개 파일), `getCart_exposesInternals` → `getCart_hidesInternals`, 신규 1개 |
 
 ### 배치 A 메모
 
@@ -373,6 +375,25 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
   - 동시성 테스트는 수정 후 3회 반복 통과. `refund_isAtomic`은 의도대로 테스트 로그에 `ERROR 처리되지 않은 예외`를 남긴다
 - 500으로 남는 예외 (의도함): `ProductServiceImpl`의 "재고 정보가 없습니다"(데이터 정합성), `Cart.updatedItemQty`의 "업데이트 실패"(도달 불가), 저널 JSON 직렬화 실패, DB 오류
 - 계획에 없는 기대값 변경: 위 1건 외 **없음**
+
+### 배치 B 메모
+
+- 테스트: 48개 → **59개**(스킵 0). 늘어난 11개는 `RequestValidationIntegrationTest` 10개, `CheckoutEdge.summary_returnsSummaryDto` 1개
+- **A6**
+  - 제약: `CartInfoReqDto` 키 3개 `@NotBlank`(포함하는 DTO 쪽 필드에 `@Valid`), `ProductReqDto.barcode` `@NotBlank`, `PaymentReqDto.paymentMethod` `@NotNull`, `RefundReqDto` 원거래 키 3개 `@NotBlank`·`reason` `@Size(max = 100)`, 일괄 담기 `@NotEmpty List<@Valid ProductReqDto>`. 메시지는 모두 한국어
+  - 현금일 때만 받은 금액 필수(Q9): 클래스 수준 제약 `@CashAmountRequired`(`domain/dto/payment/request`), 오류는 `amountReceived` 필드에 붙임
+  - 신규 `UpdateQtyReqDto`(`qty` `@NotNull @Min(1)`), 미사용 `UpdateQtyRequest` 삭제. **계획에 없던 변경**: `ProductReqDto.qty` 삭제 — 유일한 사용처가 수량 변경이었고 담기는 항상 1개라, 담기 요청에 `qty`를 보내도 무시된다
+  - 처리기: `errors[{field, message}]` 추가. `field`는 JSON 이름 — `cartInfoReqDto.` 접두사 제거, 목록은 메서드·파라미터 이름 제거 후 `[1].barcode`. 빈 목록(최상위 배열 자체)은 `field: ""`
+  - 요약 API(`getSaleSummary`)는 `@Valid` 없음 — `PaymentReqDto`를 받지만 키만 써서, 검증하면 `paymentMethod`를 잘못 요구함. 키 검증은 A1·A2에서 쿼리 파라미터로 바뀔 때
+  - 바뀐 기존 테스트 2개: `updateQty_rejectedCases`(qty 0·−1 → 400, 없는·취소된 라인은 A3 전까지 `false`), `updateQty_withoutQtyField_returns500` → `updateQty_withoutQty_returns400`
+  - 빨간 상태 확인: 12개 실패 (키 누락 200, 값 누락 NPE 500, 업무 404) — 모두 의도한 이유
+- **A5**
+  - 신규 `CartResDto`(장바구니 조회), 요약 API는 `CartSummaryResDto`. 변환은 컨트롤러에서 (서비스 시그니처는 A3·A1에서 바뀌므로 그대로)
+  - `CartSummaryResDto`에 `strCd`·`posNo`·`tranNo` 추가 → `SaleResDto.cart`에도 생김
+  - `CartResDto`와 `CartSummaryResDto`는 지금 필드가 같다. 계획대로 나눠 둠 (장바구니 응답이 키오스크 등으로 달라질 여지)
+  - 바뀐 테스트: `linesList`·`totalQtyInLines`·`totalAmountInLines` 키 치환(Cart·CheckoutEdge·CheckoutScenario·Concurrent), `getCart_hidesInternals`. `summary_ignoresPathVariables`는 계획대로 그대로 통과
+  - 빨간 상태 확인: 18개 실패 (새 키 없음)
+- 계획에 없는 기대값 변경: **없음**
 
 ## 8. 사전 확인 기록
 
