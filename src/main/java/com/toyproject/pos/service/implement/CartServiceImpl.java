@@ -1,6 +1,8 @@
 package com.toyproject.pos.service.implement;
 
 
+import com.toyproject.pos.common.exception.ProductDiscontinuedException;
+import com.toyproject.pos.common.exception.ProductNotFoundException;
 import com.toyproject.pos.common.exception.ProductNotSellableException;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.product.ProductQueryDto;
@@ -99,11 +101,11 @@ public class CartServiceImpl implements CartService {
     private ProductQueryDto getProduct(String barcode) {
         ProductQueryDto product = productService.findProduct(barcode);
         if (product == null) {
-            throw new ProductNotSellableException("상품을 찾을 수 없습니다. barcode=" + barcode);
+            throw new ProductNotFoundException(barcode);
         }
         // 판매중지만 막는다 (발주중단은 남은 재고 판매용이라 허용, 상태 NULL 도 허용)
         if (product.isDiscontinued()) {
-            throw new ProductNotSellableException("판매중지 상품입니다. barcode=" + barcode);
+            throw new ProductDiscontinuedException(barcode);
         }
 
         return product;

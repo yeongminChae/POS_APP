@@ -1,5 +1,8 @@
 package com.toyproject.pos.service.implement;
 
+import com.toyproject.pos.common.exception.AlreadyRefundedException;
+import com.toyproject.pos.common.exception.EmptyCartException;
+import com.toyproject.pos.common.exception.UnsupportedPaymentMethodException;
 import com.toyproject.pos.common.exception.TransactionNotFoundException;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.payment.request.PaymentReqDto;
@@ -80,7 +83,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // 원거래 상태를 먼저 바꿔서 중복 반품을 막음 (조건부 UPDATE 한 번이라 동시 요청에도 1건만 성공)
         if (!checkoutRepository.markRefunded(sale.getSaleId()))
-            throw new IllegalStateException("이미 반품된 거래입니다.");
+            throw new AlreadyRefundedException();
 
         // 기존 거래 반품 거래로 상태 변경
         refundedCart.refundAll();
@@ -131,7 +134,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // 정상(NORMAL) 라인이 하나도 없으면 결제 불가 (빈 카트, 전부 취소한 카트)
         if (cart.getTotalQtyInLines() == 0)
-            throw new IllegalStateException("결제할 상품이 없습니다.");
+            throw new EmptyCartException();
 
         CartSummary cartSummary = CartSummary.of(cart);
         Payment cashPayment = getPaymentSummary(paymentReq, cart.getTotalAmountInLines());
@@ -149,10 +152,10 @@ public class CheckoutServiceImpl implements CheckoutService {
                 );
 
             case CARD:
-                throw new UnsupportedOperationException("CARD 결제는 아직 미지원");
+                throw new UnsupportedPaymentMethodException("CARD 결제는 아직 미지원");
         }
 
-        throw new UnsupportedOperationException("지원하지 않는 결제 수단: " + paymentReq.getPaymentMethod());
+        throw new UnsupportedPaymentMethodException("지원하지 않는 결제 수단: " + paymentReq.getPaymentMethod());
 
     }
 
