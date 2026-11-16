@@ -65,6 +65,12 @@ POS_DB_URL="jdbc:sqlite:/절대/경로/PRODUCT_MST" ./gradlew bootRun
 
 거래 조회/반품은 DB에서 `SALE_LINES`·`PAYMENTS`를 거래 키로 읽어 `Cart`/`Payment`/`Sale`을 재구성한다 (복원은 `restoredOf` 팩토리로 저장값을 그대로 사용, 없는 거래는 `TransactionNotFoundException`). 반품(`@Transactional`)은 원거래 `SALE_STATUS`를 조건부 UPDATE로 `REFUNDED`로 바꾸고(이미 반품됐으면 거절), 원거래를 `refundAll()` 처리한 뒤 새 거래 키로 반품 `Sale`(`Sale.refundedOf`)을 새로 저장. 반품 금액은 결제액 기준이고 청구액·받은 금액은 음수로 저장된다.
 
+### API 규칙
+- 명세: `docs/api.md`. 경로는 자원 단위 복수형(`/api/carts`, `/api/carts/lines`, `/api/sales`, `/api/sales/refunds`, `/api/products`), 동작은 HTTP 메서드
+- 거래 키는 GET이면 쿼리 파라미터(`@Valid @ModelAttribute CartInfoReqDto`), 나머지는 JSON 바디(`@JsonUnwrapped @Valid CartInfoReqDto`)
+- 성공은 응답 DTO 그대로 (공통 봉투 없음). 장바구니를 바꾸는 API는 바뀐 뒤의 장바구니(`CartResDto`)를 돌려준다
+- 요청 DTO 제약에는 한국어 `message`를 지정한다. 검증 실패는 400 `VALIDATION_FAILED` + `errors[{field, message}]`(field는 JSON 이름)
+
 ### 오류 처리
 - 실패는 `common/web/GlobalExceptionHandler`가 HTTP 상태 + RFC 9457 `ProblemDetail`(`application/problem+json`)에 `code` 속성을 붙여 응답한다. 코드표는 `common/exception/ErrorCode`, 계약은 `docs/api-change-plan.md` 2.1·2.2절
 - 업무 예외는 `common/exception`에 전용 클래스로 만들고 `HasErrorCode`를 구현한다 (예외 메시지가 응답 `detail`이 됨). `IllegalStateException` 같은 기본 예외를 그대로 던지면 500 `INTERNAL_ERROR`가 된다
@@ -73,8 +79,6 @@ POS_DB_URL="jdbc:sqlite:/절대/경로/PRODUCT_MST" ./gradlew bootRun
 ### 미완성 부분
 - 카드 결제(`CARD`)는 미구현 — 서비스에서 `UnsupportedOperationException`.
 - `ProductController`의 엔드포인트는 주석 처리됨.
-- 일부 `@GetMapping` 엔드포인트가 `@RequestBody`를 받음 (`/api/cart/item`, `/api/checkout/transaction/call` 등) — 호출 시 GET에 JSON 바디를 보내야 함.
-- API 응답 형식이 통일되어 있지 않음 (`ApiResponseDto`, `boolean`, 도메인 객체 직접 반환이 섞여 있음).
 
 코드 주석과 응답 메시지는 한국어로 작성되어 있음.
 

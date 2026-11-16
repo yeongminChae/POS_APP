@@ -227,7 +227,8 @@ R1 ~ R12 (아래 4장)
 
 ### 3.3 API 변경 (요청/응답 계약이 바뀜)
 
-> 계획: [api-change-plan.md](api-change-plan.md) (구현 전).
+> ✅ **A1~A7 모두 완료** — 진행 기록은 [api-change-plan.md](api-change-plan.md) 7장, 결과 명세는 [api.md](api.md). A1·A2는 계획 중 "경로 변수" 대신 쿼리 파라미터 + 경로 재설계(A8, Q11)로 바뀌었다. 아래 표의 라인 번호는 리팩토링 전 기준.
+
 | ID | 내용 | 근거 | 깨질 테스트 |
 |---|---|---|---|
 | A1 | GET + RequestBody → 쿼리 파라미터/경로 변수 | `controller/CartController.java:24-25`, `controller/CheckoutController.java:21-29` | `PosApiTestSupport`의 `getCart`, `callTransaction` 및 이를 쓰는 대부분 |
