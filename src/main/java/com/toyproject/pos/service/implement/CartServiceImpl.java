@@ -6,6 +6,7 @@ import com.toyproject.pos.common.exception.ProductNotFoundException;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.product.ProductQueryDto;
 import com.toyproject.pos.domain.dto.product.request.ProductReqDto;
+import com.toyproject.pos.domain.dto.product.request.UpdateQtyReqDto;
 import com.toyproject.pos.domain.model.cart.Cart;
 import com.toyproject.pos.domain.model.cart.CartKey;
 import com.toyproject.pos.domain.model.cart.CartLine;
@@ -53,7 +54,7 @@ public class CartServiceImpl implements CartService {
         return true;
     }
 
-    // 다중 상품 일괄 등록: 실패 상품이 있어도 나머지는 모두 담고, 전부 성공했을 때만 true
+    // 다중 상품 일괄 등록
     @Override
     // 전부 아니면 전무: 모든 상품을 먼저 조회·검사하고, 하나라도 실패하면 아무것도 담지 않고 예외
     public boolean addItems(List<ProductReqDto> productReqDtoList) {
@@ -68,11 +69,12 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    public boolean updatedQty(ProductReqDto productReqDto) {
-        Integer qty = productReqDto.getQty();
-        String barcode = productReqDto.getBarcode();
-        CartKey cartKey = productReqDto.getKey();
+    public boolean updatedQty(UpdateQtyReqDto updateQtyReqDto) {
+        int qty = updateQtyReqDto.getQty();
+        String barcode = updateQtyReqDto.getBarcode();
+        CartKey cartKey = updateQtyReqDto.getKey();
 
+        // 요청 검증(@Min(1))을 거치지 않은 호출 대비
         if (qty <= 0) return false;
 
         return cartRepository.updateItemQty(cartKey, barcode, qty);

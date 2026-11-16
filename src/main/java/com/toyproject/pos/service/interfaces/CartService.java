@@ -2,6 +2,7 @@ package com.toyproject.pos.service.interfaces;
 
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.product.request.ProductReqDto;
+import com.toyproject.pos.domain.dto.product.request.UpdateQtyReqDto;
 import com.toyproject.pos.domain.model.cart.Cart;
 import com.toyproject.pos.domain.model.cart.CartKey;
 import com.toyproject.pos.domain.model.sale.Sale;
@@ -18,7 +19,7 @@ public interface CartService {
 
     boolean addItems(List<ProductReqDto> productReqDtoList);
 
-    boolean updatedQty(ProductReqDto productReqDto);
+    boolean updatedQty(UpdateQtyReqDto updateQtyReqDto);
 
     boolean cancelLine(ProductReqDto productReqDto);
 

@@ -6,6 +6,7 @@ import com.toyproject.pos.domain.dto.payment.request.RefundReqDto;
 import com.toyproject.pos.domain.dto.sale.SaleResDto;
 import com.toyproject.pos.domain.model.cart.CartSummary;
 import com.toyproject.pos.service.interfaces.CheckoutService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ public class CheckoutController {
 
     private final CheckoutService checkoutService;
 
+    // 요청은 거래 키만 쓰므로 PaymentReqDto 전체를 검증하지 않는다 (A1·A2에서 쿼리 파라미터로 바뀔 때 키 검증)
     @GetMapping("/{posNo}/{tranNo}/summary")
     public CartSummary getSaleSummary(@RequestBody PaymentReqDto paymentReq) {
         return checkoutService.getSaleSummary(paymentReq);
@@ -26,17 +28,17 @@ public class CheckoutController {
 
     // get 요청은 관례상 RequestBody 사용X
     @GetMapping("/transaction/call")
-    public SaleResDto getTransaction(@RequestBody CartInfoReqDto cartInfoReqDto) {
+    public SaleResDto getTransaction(@Valid @RequestBody CartInfoReqDto cartInfoReqDto) {
         return checkoutService.callTransaction(cartInfoReqDto);
     }
 
     @PostMapping
-    public SaleResDto checkOut(@RequestBody PaymentReqDto paymentReq) {
+    public SaleResDto checkOut(@Valid @RequestBody PaymentReqDto paymentReq) {
         return checkoutService.checkOut(paymentReq);
     }
 
     @PostMapping("/transaction/refund")
-    public SaleResDto refundTransaction(@RequestBody RefundReqDto refundReqDto) {
+    public SaleResDto refundTransaction(@Valid @RequestBody RefundReqDto refundReqDto) {
         return checkoutService.refundTransaction(refundReqDto);
     }
 

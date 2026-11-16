@@ -105,26 +105,36 @@ class CartIntegrationTest extends PosApiTestSupport {
     // ===== 수량 변경 / 취소 =====
 
     @Test
-    @DisplayName("수량 변경: 0·음수·카트에 없는 상품·취소된 상품은 false")
+    @DisplayName("수량 변경: 0·음수는 400 VALIDATION_FAILED, 카트에 없는 상품·취소된 상품은 false")
     void updateQty_rejectedCases() throws Exception {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
         addItem(POS_1, tranNo, CHOCO);
         cancelItem(POS_1, tranNo, CHOCO);
 
-        assertThat(json(updateQty(POS_1, tranNo, CHIPS, 0)).asBoolean()).isFalse();
-        assertThat(json(updateQty(POS_1, tranNo, CHIPS, -1)).asBoolean()).isFalse();
+        for (int qty : new int[]{0, -1}) {
+            JsonNode err = error(updateQty(POS_1, tranNo, CHIPS, qty), 400, "VALIDATION_FAILED");
+            assertThat(err.at("/errors/0/field").asText()).isEqualTo("qty");
+            assertThat(err.at("/errors/0/message").asText()).isEqualTo("수량은 1 이상이어야 합니다");
+        }
         assertThat(json(updateQty(POS_1, tranNo, COOKIE, 2)).asBoolean()).isFalse();
         assertThat(json(updateQty(POS_1, tranNo, CHOCO, 2)).asBoolean()).isFalse();
         assertThat(json(getCart(POS_1, tranNo)).at("/linesList/0/qty").asInt()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 수량 변경 요청에 qty 를 빼면 NPE → 500 INTERNAL_ERROR (B13, A6 요청 검증에서 400으로 바뀜)")
-    void updateQty_withoutQtyField_returns500() throws Exception {
+    @DisplayName("수량 변경 요청에 qty 를 빼면 400 VALIDATION_FAILED (B13)")
+    void updateQty_withoutQty_returns400() throws Exception {
         String tranNo = newTranNo();
+        addItem(POS_1, tranNo, CHIPS);
 
-        error(perform(post("/api/cart/item/update/qty"), with(key(POS_1, tranNo), "barcode", CHIPS)), 500, "INTERNAL_ERROR");
+        JsonNode err = error(perform(post("/api/cart/item/update/qty"), with(key(POS_1, tranNo), "barcode", CHIPS)),
+                400, "VALIDATION_FAILED");
+
+        assertThat(err.get("detail").asText()).isEqualTo("요청 값이 올바르지 않습니다.");
+        assertThat(err.at("/errors/0/field").asText()).isEqualTo("qty");
+        assertThat(err.at("/errors/0/message").asText()).isEqualTo("수량은 필수입니다");
+        assertThat(json(getCart(POS_1, tranNo)).at("/linesList/0/qty").asInt()).isEqualTo(1);
     }
 
     @Test

@@ -2,9 +2,12 @@ package com.toyproject.pos.controller;
 
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.product.request.ProductReqDto;
+import com.toyproject.pos.domain.dto.product.request.UpdateQtyReqDto;
 import com.toyproject.pos.domain.dto.response.ApiResponseDto;
 import com.toyproject.pos.domain.model.cart.Cart;
 import com.toyproject.pos.service.interfaces.CartService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,38 +25,33 @@ public class CartController {
     private final CartService cartService;
 
     @GetMapping("/item")
-    public Cart getCurrentCart(@RequestBody CartInfoReqDto cartInfoReqDto) {
+    public Cart getCurrentCart(@Valid @RequestBody CartInfoReqDto cartInfoReqDto) {
         return cartService.getCurrentCart(cartInfoReqDto);
     }
 
     // 상품 조회 및 데이터 저장
     // *** 현재 임시 데이터 저장소 사용 -> 추후 실제 DB로 이주 계획
     @PostMapping("/item/add")
-    public ResponseEntity<ApiResponseDto> addToCart(@RequestBody ProductReqDto productReqDto) {
+    public ResponseEntity<ApiResponseDto> addToCart(@Valid @RequestBody ProductReqDto productReqDto) {
         return toAddItemResponse(cartService.addItem(productReqDto));
     }
 
     // 다중 상품 일괄 등록
     @PostMapping("/item/add/many")
-    public ResponseEntity<ApiResponseDto> addToCart(@RequestBody List<ProductReqDto> productReqDtoList) {
+    public ResponseEntity<ApiResponseDto> addToCart(
+            @RequestBody @NotEmpty(message = "담을 상품이 없습니다") List<@Valid ProductReqDto> productReqDtoList) {
         return toAddItemResponse(cartService.addItems(productReqDtoList));
     }
 
     // 상품 수량 업데이트
     @PostMapping("/item/update/qty")
-    public boolean updatedProductQty(@RequestBody ProductReqDto productReqDto) {
-        if (productReqDto.getQty() > 1) {
-            // todo
-            // "qty 1이상일 때만 정상 처리"
-        }
-
-        return cartService.updatedQty(productReqDto);
-
+    public boolean updatedProductQty(@Valid @RequestBody UpdateQtyReqDto updateQtyReqDto) {
+        return cartService.updatedQty(updateQtyReqDto);
     }
 
     // 지정 취소
     @PostMapping("/item/cancel")
-    public boolean cancelLine(@RequestBody ProductReqDto productReqDto) {
+    public boolean cancelLine(@Valid @RequestBody ProductReqDto productReqDto) {
         return cartService.cancelLine(productReqDto);
 
     }
