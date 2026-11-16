@@ -53,7 +53,7 @@ POS_DB_URL="jdbc:sqlite:/절대/경로/PRODUCT_MST" ./gradlew bootRun
 거래는 `CartKey(strCd, posNo, tranNo)`로 식별. 대부분의 요청 DTO가 `CartInfoReqDto`를 포함하고 `getKey()`로 `CartKey`를 꺼냄.
 
 ### 장바구니 (DB에 없음)
-상품 담기(`CartServiceImpl.addItem`)는 미등록·판매중지(`discontinued`) 상품만 `false`(`ProductNotSellableException`)로 처리하고, 그 밖의 예외(DB 오류 등)는 전파한다. 발주중단(`suspend_order`)·상태 NULL은 판매 허용.
+상품 담기(`CartServiceImpl.addItem`)는 미등록이면 `ProductNotFoundException`, 판매중지(`discontinued`)면 `ProductDiscontinuedException`을 던진다 (발주중단 `suspend_order`·상태 NULL은 판매 허용). 일괄 담기는 전부 검사한 뒤 담는다(하나라도 실패하면 아무것도 안 담음).
 
 `CartRepositoryImpl`은 **인메모리 `ConcurrentHashMap<CartKey, Cart>`** 임시 저장소다 (추후 DB 이전 예정). 키는 점포·POS·거래번호 조합(`CartKey`, `@EqualsAndHashCode`)이고, POS 여러 대의 동시 요청을 전제로 동시 접근에 안전한 맵을 쓴다. 서버 재시작 시 장바구니가 사라진다. 상품 정보만 `ProductMapper`로 DB(`PRODUCT`)에서 조회.
 
@@ -64,6 +64,11 @@ POS_DB_URL="jdbc:sqlite:/절대/경로/PRODUCT_MST" ./gradlew bootRun
 4. 커밋 후(`TransactionSynchronization.afterCommit`) 인메모리 장바구니 삭제
 
 거래 조회/반품은 DB에서 `SALE_LINES`·`PAYMENTS`를 거래 키로 읽어 `Cart`/`Payment`/`Sale`을 재구성한다 (복원은 `restoredOf` 팩토리로 저장값을 그대로 사용, 없는 거래는 `TransactionNotFoundException`). 반품(`@Transactional`)은 원거래 `SALE_STATUS`를 조건부 UPDATE로 `REFUNDED`로 바꾸고(이미 반품됐으면 거절), 원거래를 `refundAll()` 처리한 뒤 새 거래 키로 반품 `Sale`(`Sale.refundedOf`)을 새로 저장. 반품 금액은 결제액 기준이고 청구액·받은 금액은 음수로 저장된다.
+
+### 오류 처리
+- 실패는 `common/web/GlobalExceptionHandler`가 HTTP 상태 + RFC 9457 `ProblemDetail`(`application/problem+json`)에 `code` 속성을 붙여 응답한다. 코드표는 `common/exception/ErrorCode`, 계약은 `docs/api-change-plan.md` 2.1·2.2절
+- 업무 예외는 `common/exception`에 전용 클래스로 만들고 `HasErrorCode`를 구현한다 (예외 메시지가 응답 `detail`이 됨). `IllegalStateException` 같은 기본 예외를 그대로 던지면 500 `INTERNAL_ERROR`가 된다
+- 테스트에서는 `PosApiTestSupport.error(result, status, code)`로 오류 응답을 검사한다
 
 ### 미완성 부분
 - 카드 결제(`CARD`)는 미구현 — 서비스에서 `UnsupportedOperationException`.

@@ -347,9 +347,32 @@ Spring 6 기본 지원인 **RFC 9457 `ProblemDetail`** (`application/problem+jso
 
 ## 7. 진행 현황
 
-| 순서 | 항목 | 커밋 | 비고 |
-|---|---|---|---|
-| | | | |
+| 순서 | 배치 | 항목 | 커밋 | 비고 |
+|---|---|---|---|---|
+| 1 | A | A0-0 주석·중복 코드 정리 | `43cf907` | refactor, 테스트 변경 없음 |
+| 2 | A | A0-1 전용 예외 클래스 | `b1313ef` | refactor, 테스트 변경 없음 |
+| 3 | A | A0-2 B11 거래번호 재사용 거절 | `59194fe` | `reuseTranNoAfterCheckout_violatesUnique` → `reuseTranNoAfterCheckout_isRejected` |
+| 4 | A | A4 전역 예외 처리기 | `62e9777` | 기존 테스트 17개 기대값 변경, 신규 `ErrorResponseIntegrationTest` 2개 |
+
+### 배치 A 메모
+
+- 테스트: 46개 → **48개**(스킵 0). 늘어난 2개는 `ErrorResponseIntegrationTest`(깨진 JSON, 없는 결제 수단 값)
+- **A0-0**: 주석 처리된 매퍼 메서드 2개·XML `<select>` 2개·`CheckoutService.getSaleData` 주석, `withOriginSaleId` 호출과 메서드 삭제. 테스트 변경 없이 통과 (반품 응답 `origSaleId`는 `SaleResDto.of`가 채움 — `fullScenario`·`callRefundTransaction_returnsRefund`로 확인)
+- **A0-1**
+  - `common/exception/ErrorCode`(13개, HTTP 상태 보유)와 인터페이스 `HasErrorCode`를 추가. 계획 2.2절의 추상 클래스 `PosException`은 **만들지 않았다** — 전용 예외가 `IllegalArgumentException` 등 기존 타입을 상속해야 해서 인터페이스만으로 충분 (3장 A0-1에 적은 방식)
+  - 전용 예외 7개: `InvalidCashAmountException`·`InsufficientCashException`(← IAE), `EmptyCartException`·`AlreadyRefundedException`(← ISE), `UnsupportedPaymentMethodException`(← UOE), `ProductNotFoundException`·`ProductDiscontinuedException`(← 추상 `ProductNotSellableException`). `TransactionNotFoundException`에 `HasErrorCode` 추가. 메시지는 그대로라 테스트 변경 없음
+- **A0-2 (B11)**: 빨간 이유 — 루트 원인이 `SQLiteException`(UNIQUE 위반). `checkOut` 맨 앞에서 `existsTransaction`으로 확인 후 `DuplicateTransactionException`(← ISE). `failedCheckout_doesNotDecreaseStock`은 계획대로 그대로 통과
+- **A4**
+  - `common/web/GlobalExceptionHandler`(`ResponseEntityExceptionHandler` 상속): `HasErrorCode` → 해당 상태·코드, 예외 메시지를 `detail`로 / `MethodArgumentNotValidException`·`ConstraintViolationException` → 400 `VALIDATION_FAILED` / `HttpMessageNotReadableException` → 400 `MALFORMED_REQUEST` / 그 외 → 500 `INTERNAL_ERROR`, `detail`은 "서버 오류가 발생했습니다.", 원인은 `log.error`
+  - 검증 예외 두 가지는 A6에서 쓰지만, X1 결과대로 처리기에 미리 넣었다 (지금은 검증 제약이 없어 발생하지 않음). `errors[]` 필드 목록과 필드 이름 정규화는 계획대로 A6
+  - 상품 담기: `addItem`의 `catch` 제거 → 미등록 404 `PRODUCT_NOT_FOUND`, 판매중지 409 `PRODUCT_DISCONTINUED`. `addItem`은 A3까지 항상 `true`. 일괄 담기는 **먼저 전부 조회·검사한 뒤** 담음 (Q4 전부 아니면 전무). `toAddItemResponse`의 "HTTP 200 + 바디 404" 분기 삭제
+  - 테스트 헬퍼 `PosApiTestSupport.error(result, status, code)` 추가: HTTP 상태, `application/problem+json`, `code`를 검사하고 바디를 돌려줌
+  - 바뀐 기존 테스트 17개: `CheckoutEdge` 9개(`insufficientCash_isRejected`, `zeroCash_throws`→`zeroCash_isRejected`, `emptyCart_isRejected`, `allCancelledCart_isRejected`, `cardPayment_isUnsupported`, `callUnknownTransaction_*`→`_returns404`, `refundUnknownTransaction_*`→`_returns404`, `reuseTranNoAfterCheckout_isRejected`, `failedCheckout_doesNotDecreaseStock`), `CheckoutScenario` 3개(`refundTwice_isRejected`, `refundOfRefund_isRejected`, `refund_isAtomic`), `Concurrent` 1개(`sameOriginal_refundedConcurrently_onlyOnce` — 예외 수집 → 응답 상태 수집, 200·409 각 1건), `Cart` 4개(`unknownBarcode_*`→`_returns404`, `discontinuedProduct_isRejected`, `addMany_withUnknown_*`→`_addsNothing`, 아래 `updateQty_withoutQtyField_*`), `CartServiceImplTest` 2개(`false` → 예외)
+  - 빨간 상태 확인: 수정 전 21개 실패 (예외가 그대로 전파되거나, 미등록·판매중지가 HTTP 200) — 모두 의도한 이유
+  - **⚠️ 계획에 없던 기대값 변경 1건**: `CartIntegrationTest.updateQty_withoutQtyField_throwsNpe` → `updateQty_withoutQtyField_returns500`. 처리기가 모든 예외를 응답으로 바꾸므로 NPE도 던져지지 않고 500 `INTERNAL_ERROR`가 된다. 3장 A4 표에서 빠뜨린 항목이고 동작상 자연스러운 결과라 그대로 진행했다. B13은 A6에서 400으로 바뀜
+  - 동시성 테스트는 수정 후 3회 반복 통과. `refund_isAtomic`은 의도대로 테스트 로그에 `ERROR 처리되지 않은 예외`를 남긴다
+- 500으로 남는 예외 (의도함): `ProductServiceImpl`의 "재고 정보가 없습니다"(데이터 정합성), `Cart.updatedItemQty`의 "업데이트 실패"(도달 불가), 저널 JSON 직렬화 실패, DB 오류
+- 계획에 없는 기대값 변경: 위 1건 외 **없음**
 
 ## 8. 사전 확인 기록
 
