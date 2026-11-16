@@ -5,7 +5,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
@@ -77,7 +76,7 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
 
-        error(perform(post("/api/checkout"), with(key(POS_1, tranNo), "paymentMethod", "CARD")),
+        error(perform(post(SALES), with(key(POS_1, tranNo), "paymentMethod", "CARD")),
                 400, "UNSUPPORTED_PAYMENT_METHOD");
 
         assertThat(countSales(POS_1, tranNo)).isZero();
@@ -131,12 +130,12 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작] 결제 요약 API 는 경로의 posNo/tranNo 를 무시하고 바디의 키를 쓴다")
-    void summary_ignoresPathVariables() throws Exception {
+    @DisplayName("결제 요약 API 는 쿼리 파라미터의 거래 키로 조회한다")
+    void summary_usesQueryParameters() throws Exception {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
 
-        JsonNode summary = json(perform(get("/api/checkout/{posNo}/{tranNo}/summary", "99", "IGNORED"), key(POS_1, tranNo)));
+        JsonNode summary = ok(getSummary(POS_1, tranNo));
 
         assertThat(summary.get("tranNo").asText()).isEqualTo(tranNo);
         assertThat(amt(summary.get("totalAmount"))).isEqualByComparingTo("1500");
@@ -148,7 +147,7 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
 
-        JsonNode summary = json(perform(get("/api/checkout/{posNo}/{tranNo}/summary", POS_1, tranNo), key(POS_1, tranNo)));
+        JsonNode summary = ok(getSummary(POS_1, tranNo));
 
         assertThat(summary.fieldNames()).toIterable()
                 .containsExactlyInAnyOrder("strCd", "posNo", "tranNo", "totalQty", "totalAmount", "lines");

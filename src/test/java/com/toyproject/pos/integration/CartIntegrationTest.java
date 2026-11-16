@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
@@ -129,7 +130,7 @@ class CartIntegrationTest extends PosApiTestSupport {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
 
-        JsonNode err = error(perform(post("/api/cart/item/update/qty"), with(key(POS_1, tranNo), "barcode", CHIPS)),
+        JsonNode err = error(perform(patch(CART_LINES), with(key(POS_1, tranNo), "barcode", CHIPS)),
                 400, "VALIDATION_FAILED");
 
         assertThat(err.get("detail").asText()).isEqualTo("요청 값이 올바르지 않습니다.");
@@ -206,7 +207,7 @@ class CartIntegrationTest extends PosApiTestSupport {
         addItem(POS_1, tranNo, CHIPS);
 
         var otherStore = with(with(key(POS_1, tranNo), "strCd", "S99"), "barcode", CHOCO);
-        perform(post("/api/cart/item/add"), otherStore);
+        perform(post(CART_LINES), otherStore);
 
         JsonNode cart = json(getCart(POS_1, tranNo));
         assertThat(cart.get("strCd").asText()).isEqualTo(STORE);

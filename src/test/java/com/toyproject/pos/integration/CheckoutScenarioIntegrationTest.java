@@ -257,7 +257,7 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
         body.put("origStrCd", STORE);
         body.put("origPosNo", POS_1);
         body.put("origTranNo", tranNo);
-        perform(post("/api/checkout/transaction/refund"), body);
+        perform(post(SALE_REFUNDS), body);
 
         assertThat(refundTrJson(refundTranNo).at("/refundDetail/reason").isNull()).isTrue();
     }

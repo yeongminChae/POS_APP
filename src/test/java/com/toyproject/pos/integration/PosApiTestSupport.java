@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
@@ -43,6 +44,15 @@ abstract class PosApiTestSupport {
     static final String ADULT_SOJU = "8800000000009"; // 1950, 성인 전용
     static final String DISCONTINUED = "8800000000010"; // 2800, 판매중지, 재고 0
     static final String UNKNOWN = "8800000009999";
+
+    // API 경로 (자원 단위, api-change-plan 2.3절)
+    static final String CARTS = "/api/carts";
+    static final String CART_SUMMARY = "/api/carts/summary";
+    static final String CART_LINES = "/api/carts/lines";
+    static final String CART_LINES_BATCH = "/api/carts/lines/batch";
+    static final String CART_LINES_CANCEL = "/api/carts/lines/cancel";
+    static final String SALES = "/api/sales";
+    static final String SALE_REFUNDS = "/api/sales/refunds";
 
     private static final AtomicInteger TRAN_SEQ = new AtomicInteger(1000);
 
@@ -70,38 +80,42 @@ abstract class PosApiTestSupport {
         return m;
     }
 
-    // ===== API 호출 (컨트롤러 시그니처 그대로: GET 에도 JSON 바디) =====
+    // ===== API 호출 (GET 은 쿼리 파라미터, 나머지는 JSON 바디) =====
 
     ResultActions getCart(String posNo, String tranNo) throws Exception {
-        return perform(get("/api/cart/item"), key(posNo, tranNo));
+        return query(CARTS, posNo, tranNo);
+    }
+
+    ResultActions getSummary(String posNo, String tranNo) throws Exception {
+        return query(CART_SUMMARY, posNo, tranNo);
     }
 
     ResultActions addItem(String posNo, String tranNo, String barcode) throws Exception {
-        return perform(post("/api/cart/item/add"), with(key(posNo, tranNo), "barcode", barcode));
+        return perform(post(CART_LINES), with(key(posNo, tranNo), "barcode", barcode));
     }
 
     ResultActions addItems(String posNo, String tranNo, String... barcodes) throws Exception {
         Object[] body = new Object[barcodes.length];
         for (int i = 0; i < barcodes.length; i++) body[i] = with(key(posNo, tranNo), "barcode", barcodes[i]);
-        return perform(post("/api/cart/item/add/many"), body);
+        return perform(post(CART_LINES_BATCH), body);
     }
 
     ResultActions updateQty(String posNo, String tranNo, String barcode, int qty) throws Exception {
-        return perform(post("/api/cart/item/update/qty"),
+        return perform(patch(CART_LINES),
                 with(with(key(posNo, tranNo), "barcode", barcode), "qty", qty));
     }
 
     ResultActions cancelItem(String posNo, String tranNo, String barcode) throws Exception {
-        return perform(post("/api/cart/item/cancel"), with(key(posNo, tranNo), "barcode", barcode));
+        return perform(post(CART_LINES_CANCEL), with(key(posNo, tranNo), "barcode", barcode));
     }
 
     ResultActions checkoutCash(String posNo, String tranNo, long amountReceived) throws Exception {
         Map<String, Object> body = with(with(key(posNo, tranNo), "paymentMethod", "CASH"), "amountReceived", amountReceived);
-        return perform(post("/api/checkout"), body);
+        return perform(post(SALES), body);
     }
 
     ResultActions callTransaction(String posNo, String tranNo) throws Exception {
-        return perform(get("/api/checkout/transaction/call"), key(posNo, tranNo));
+        return query(SALES, posNo, tranNo);
     }
 
     ResultActions refund(String newPosNo, String newTranNo, String origPosNo, String origTranNo) throws Exception {
@@ -110,7 +124,12 @@ abstract class PosApiTestSupport {
         body.put("origPosNo", origPosNo);
         body.put("origTranNo", origTranNo);
         body.put("reason", "테스트 반품");
-        return perform(post("/api/checkout/transaction/refund"), body);
+        return perform(post(SALE_REFUNDS), body);
+    }
+
+    /** 거래 키를 쿼리 파라미터로 보내는 GET */
+    ResultActions query(String path, String posNo, String tranNo) throws Exception {
+        return mvc.perform(get(path).param("strCd", STORE).param("posNo", posNo).param("tranNo", tranNo));
     }
 
     ResultActions perform(MockHttpServletRequestBuilder builder, Object body) throws Exception {

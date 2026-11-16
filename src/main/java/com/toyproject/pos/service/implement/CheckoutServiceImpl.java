@@ -40,11 +40,6 @@ public class CheckoutServiceImpl implements CheckoutService {
     private final CheckoutRepository checkoutRepository;
 
     @Override
-    public CartSummary getSaleSummary(PaymentReqDto paymentReq) {
-        return CartSummary.of(getCurrentCart(paymentReq));
-    }
-
-    @Override
     @Transactional
     public SaleResDto checkOut(PaymentReqDto paymentReq) {
         // 이미 결제된 거래번호면 거절. IMMEDIATE 트랜잭션이라 확인과 저장 사이에 다른 POS 가 끼어들 수 없음

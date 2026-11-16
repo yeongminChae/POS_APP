@@ -5,6 +5,7 @@ import com.toyproject.pos.domain.dto.product.request.ProductReqDto;
 import com.toyproject.pos.domain.dto.product.request.UpdateQtyReqDto;
 import com.toyproject.pos.domain.model.cart.Cart;
 import com.toyproject.pos.domain.model.cart.CartKey;
+import com.toyproject.pos.domain.model.cart.CartSummary;
 import com.toyproject.pos.domain.model.sale.Sale;
 
 import java.util.List;
@@ -14,6 +15,8 @@ public interface CartService {
     Cart getCurrentCart(CartInfoReqDto cartInfoReqDto);
 
     Cart getCurrentCart(CartKey cartKey);
+
+    CartSummary getCartSummary(CartKey cartKey);
 
     Cart addItem(ProductReqDto productReqDto);
 

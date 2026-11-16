@@ -11,6 +11,7 @@ import com.toyproject.pos.domain.dto.product.request.UpdateQtyReqDto;
 import com.toyproject.pos.domain.model.cart.Cart;
 import com.toyproject.pos.domain.model.cart.CartKey;
 import com.toyproject.pos.domain.model.cart.CartLine;
+import com.toyproject.pos.domain.model.cart.CartSummary;
 import com.toyproject.pos.domain.model.sale.Sale;
 import com.toyproject.pos.repository.interfaces.CartRepository;
 import com.toyproject.pos.service.interfaces.CartService;
@@ -38,6 +39,12 @@ public class CartServiceImpl implements CartService {
     @Override
     public Cart getCurrentCart(CartKey cartKey) {
         return cartRepository.getCurrentCart(cartKey);
+    }
+
+    // 결제 전 요약 (합계는 정상 라인 기준)
+    @Override
+    public CartSummary getCartSummary(CartKey cartKey) {
+        return CartSummary.of(getCurrentCart(cartKey));
     }
 
     // 상품 데이터 조회 + 조회 해온 결과 cart 모델에 담는 함수
