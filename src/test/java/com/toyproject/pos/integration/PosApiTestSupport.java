@@ -131,6 +131,12 @@ abstract class PosApiTestSupport {
         return body;
     }
 
+    /** 성공 응답 검사: HTTP 200 이고 바디(JsonNode)를 돌려준다 */
+    JsonNode ok(ResultActions result) throws Exception {
+        assertThat(result.andReturn().getResponse().getStatus()).isEqualTo(200);
+        return json(result);
+    }
+
     JsonNode json(ResultActions result) throws Exception {
         return objectMapper.readTree(result.andReturn().getResponse().getContentAsString());
     }

@@ -19,9 +19,9 @@ class CartIntegrationTest extends PosApiTestSupport {
     void adultOnlyProduct_isAddedWithoutCheck() throws Exception {
         String tranNo = newTranNo();
 
-        JsonNode res = json(addItem(POS_1, tranNo, ADULT_SOJU));
+        JsonNode cart = ok(addItem(POS_1, tranNo, ADULT_SOJU));
 
-        assertThat(res.get("status").asInt()).isEqualTo(200);
+        assertThat(cart.at("/lines/0/barcode").asText()).isEqualTo(ADULT_SOJU);
         assertThat(json(getCart(POS_1, tranNo)).at("/lines/0/barcode").asText()).isEqualTo(ADULT_SOJU);
     }
 
@@ -45,7 +45,8 @@ class CartIntegrationTest extends PosApiTestSupport {
                 jdbc.update("UPDATE PRODUCT SET PRODUCT_STATUS = ? WHERE PRODUCT_ID = 'P004'", status);
                 String tranNo = newTranNo();
 
-                assertThat(json(addItem(POS_1, tranNo, "8800000000004")).get("status").asInt()).isEqualTo(200);
+                assertThat(ok(addItem(POS_1, tranNo, "8800000000004")).at("/lines/0/barcode").asText())
+                        .isEqualTo("8800000000004");
             }
         } finally {
             jdbc.update("UPDATE PRODUCT SET PRODUCT_STATUS = ? WHERE PRODUCT_ID = 'P004'", original);
@@ -105,7 +106,7 @@ class CartIntegrationTest extends PosApiTestSupport {
     // ===== 수량 변경 / 취소 =====
 
     @Test
-    @DisplayName("수량 변경: 0·음수는 400 VALIDATION_FAILED, 카트에 없는 상품·취소된 상품은 false")
+    @DisplayName("수량 변경: 0·음수는 400 VALIDATION_FAILED, 카트에 없는 상품·취소된 상품은 404 CART_LINE_NOT_FOUND")
     void updateQty_rejectedCases() throws Exception {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
@@ -117,8 +118,8 @@ class CartIntegrationTest extends PosApiTestSupport {
             assertThat(err.at("/errors/0/field").asText()).isEqualTo("qty");
             assertThat(err.at("/errors/0/message").asText()).isEqualTo("수량은 1 이상이어야 합니다");
         }
-        assertThat(json(updateQty(POS_1, tranNo, COOKIE, 2)).asBoolean()).isFalse();
-        assertThat(json(updateQty(POS_1, tranNo, CHOCO, 2)).asBoolean()).isFalse();
+        error(updateQty(POS_1, tranNo, COOKIE, 2), 404, "CART_LINE_NOT_FOUND");
+        error(updateQty(POS_1, tranNo, CHOCO, 2), 404, "CART_LINE_NOT_FOUND");
         assertThat(json(getCart(POS_1, tranNo)).at("/lines/0/qty").asInt()).isEqualTo(1);
     }
 
@@ -138,14 +139,15 @@ class CartIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("취소: 카트에 없는 상품·이미 취소된 상품은 false, 취소 후 재스캔하면 새 라인 생성")
+    @DisplayName("취소: 카트에 없는 상품·이미 취소된 상품은 404 CART_LINE_NOT_FOUND, 취소 후 재스캔하면 새 라인 생성")
     void cancel_andRescan() throws Exception {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHOCO);
 
-        assertThat(json(cancelItem(POS_1, tranNo, COOKIE)).asBoolean()).isFalse();
-        assertThat(json(cancelItem(POS_1, tranNo, CHOCO)).asBoolean()).isTrue();
-        assertThat(json(cancelItem(POS_1, tranNo, CHOCO)).asBoolean()).isFalse();
+        JsonNode err = error(cancelItem(POS_1, tranNo, COOKIE), 404, "CART_LINE_NOT_FOUND");
+        assertThat(err.get("detail").asText()).isEqualTo("장바구니에 없는 상품입니다. barcode=" + COOKIE);
+        assertThat(ok(cancelItem(POS_1, tranNo, CHOCO)).at("/lines/0/itemStatus").asText()).isEqualTo("CANCELLED");
+        error(cancelItem(POS_1, tranNo, CHOCO), 404, "CART_LINE_NOT_FOUND");
 
         addItem(POS_1, tranNo, CHOCO);
 

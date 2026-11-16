@@ -15,13 +15,13 @@ public interface CartService {
 
     Cart getCurrentCart(CartKey cartKey);
 
-    boolean addItem(ProductReqDto productReqDto);
+    Cart addItem(ProductReqDto productReqDto);
 
-    boolean addItems(List<ProductReqDto> productReqDtoList);
+    Cart addItems(List<ProductReqDto> productReqDtoList);
 
-    boolean updatedQty(UpdateQtyReqDto updateQtyReqDto);
+    Cart updatedQty(UpdateQtyReqDto updateQtyReqDto);
 
-    boolean cancelLine(ProductReqDto productReqDto);
+    Cart cancelLine(ProductReqDto productReqDto);
 
     void clearCart(Sale sale);
 

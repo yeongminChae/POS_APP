@@ -27,16 +27,16 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
         assertThat(amt(empty.get("totalAmount"))).isEqualByComparingTo("0");
 
         // 2) 상품 담기 — 같은 바코드 재스캔은 수량 증가
-        assertThat(json(addItem(POS_1, tranNo, CHIPS)).get("status").asInt()).isEqualTo(200);
+        assertThat(ok(addItem(POS_1, tranNo, CHIPS)).get("totalQty").asInt()).isEqualTo(1);
         addItem(POS_1, tranNo, CHIPS);
         addItem(POS_1, tranNo, CHOCO);
         addItem(POS_1, tranNo, COOKIE);
 
         // 3) 수량 변경 (절대값 설정)
-        assertThat(json(updateQty(POS_1, tranNo, COOKIE, 3)).asBoolean()).isTrue();
+        assertThat(ok(updateQty(POS_1, tranNo, COOKIE, 3)).at("/lines/2/qty").asInt()).isEqualTo(3);
 
         // 4) 상품 취소 (지정 취소)
-        assertThat(json(cancelItem(POS_1, tranNo, CHOCO)).asBoolean()).isTrue();
+        assertThat(ok(cancelItem(POS_1, tranNo, CHOCO)).at("/lines/1/itemStatus").asText()).isEqualTo("CANCELLED");
 
         JsonNode cart = json(getCart(POS_1, tranNo));
         JsonNode lines = cart.get("lines");

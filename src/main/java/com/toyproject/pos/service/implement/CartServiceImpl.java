@@ -1,6 +1,7 @@
 package com.toyproject.pos.service.implement;
 
 
+import com.toyproject.pos.common.exception.CartLineNotFoundException;
 import com.toyproject.pos.common.exception.ProductDiscontinuedException;
 import com.toyproject.pos.common.exception.ProductNotFoundException;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
@@ -42,8 +43,8 @@ public class CartServiceImpl implements CartService {
     // 상품 데이터 조회 + 조회 해온 결과 cart 모델에 담는 함수
     @Override
     // 미등록·판매중지는 예외(ProductNotFoundException / ProductDiscontinuedException)로 알리고, 전역 처리기가 404 / 409로 응답
-    // 반환값은 A3(응답 형식 통일)에서 Cart 로 바뀔 때까지 항상 true
-    public boolean addItem(ProductReqDto productReqDto) {
+    // 장바구니를 바꾸는 메서드는 모두 바뀐 뒤의 장바구니를 돌려준다
+    public Cart addItem(ProductReqDto productReqDto) {
         // 상품 조회 + CartLine 생성
         CartLine cartLine = toCartLine(productReqDto);
 
@@ -51,13 +52,13 @@ public class CartServiceImpl implements CartService {
         // 재고는 담을 때가 아니라 결제·반품 시점에 반영 (CheckoutServiceImpl)
         cartRepository.addOrIncrease(productReqDto.getKey(), cartLine);
 
-        return true;
+        return getCurrentCart(productReqDto.getKey());
     }
 
     // 다중 상품 일괄 등록
     @Override
     // 전부 아니면 전무: 모든 상품을 먼저 조회·검사하고, 하나라도 실패하면 아무것도 담지 않고 예외
-    public boolean addItems(List<ProductReqDto> productReqDtoList) {
+    public Cart addItems(List<ProductReqDto> productReqDtoList) {
         List<CartLine> cartLines = new ArrayList<>();
         for (ProductReqDto productReqDto : productReqDtoList)
             cartLines.add(toCartLine(productReqDto));
@@ -65,28 +66,35 @@ public class CartServiceImpl implements CartService {
         for (int i = 0; i < productReqDtoList.size(); i++)
             cartRepository.addOrIncrease(productReqDtoList.get(i).getKey(), cartLines.get(i));
 
-        return true;
+        // 요청마다 키를 받지만 한 장바구니에 담는 API 라 첫 요청의 키로 돌려준다 (빈 목록은 요청 검증에서 400)
+        return getCurrentCart(productReqDtoList.get(0).getKey());
     }
 
     @Override
-    public boolean updatedQty(UpdateQtyReqDto updateQtyReqDto) {
+    public Cart updatedQty(UpdateQtyReqDto updateQtyReqDto) {
         int qty = updateQtyReqDto.getQty();
         String barcode = updateQtyReqDto.getBarcode();
         CartKey cartKey = updateQtyReqDto.getKey();
 
-        // 요청 검증(@Min(1))을 거치지 않은 호출 대비
-        if (qty <= 0) return false;
+        // 요청 검증(@Min(1))을 거치지 않은 잘못된 호출
+        if (qty <= 0) throw new IllegalArgumentException("수량은 1 이상이어야 합니다. qty=" + qty);
 
-        return cartRepository.updateItemQty(cartKey, barcode, qty);
+        if (!cartRepository.updateItemQty(cartKey, barcode, qty))
+            throw new CartLineNotFoundException(barcode);
+
+        return getCurrentCart(cartKey);
 
     }
 
     @Override
-    public boolean cancelLine(ProductReqDto productReqDto) {
+    public Cart cancelLine(ProductReqDto productReqDto) {
         CartKey cartKey = productReqDto.getKey();
         String barcode = productReqDto.getBarcode();
 
-        return cartRepository.updateStatusToCancel(cartKey, barcode);
+        if (!cartRepository.updateStatusToCancel(cartKey, barcode))
+            throw new CartLineNotFoundException(barcode);
+
+        return getCurrentCart(cartKey);
     }
 
     @Override

@@ -137,7 +137,7 @@ class ConcurrentPosIntegrationTest extends PosApiTestSupport {
                 results.add(pool.submit(awaiting(start, () -> {
                     List<Integer> statuses = new ArrayList<>();
                     for (String tranNo : mine)
-                        statuses.add(json(addItem(posNo, tranNo, CHIPS)).get("status").asInt());
+                        statuses.add(addItem(posNo, tranNo, CHIPS).andReturn().getResponse().getStatus());
                     return statuses;
                 })));
             }

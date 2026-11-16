@@ -107,7 +107,7 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
         checkoutCash(POS_1, tranNo, 2000);
 
         // 결제 후 같은 키로 담기는 막히지 않는다
-        assertThat(json(addItem(POS_1, tranNo, CHIPS)).get("status").asInt()).isEqualTo(200);
+        ok(addItem(POS_1, tranNo, CHIPS));
 
         JsonNode err = error(checkoutCash(POS_1, tranNo, 2000), 409, "DUPLICATE_TRANSACTION");
         assertThat(err.get("detail").asText()).isEqualTo("이미 결제된 거래번호입니다.");

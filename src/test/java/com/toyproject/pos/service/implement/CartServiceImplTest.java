@@ -5,6 +5,8 @@ import com.toyproject.pos.common.exception.ProductNotFoundException;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.product.ProductQueryDto;
 import com.toyproject.pos.domain.dto.product.request.ProductReqDto;
+import com.toyproject.pos.domain.model.cart.Cart;
+import com.toyproject.pos.domain.model.cart.CartKey;
 import com.toyproject.pos.repository.interfaces.CartRepository;
 import com.toyproject.pos.service.interfaces.ProductService;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -28,6 +31,7 @@ import static org.mockito.Mockito.when;
 class CartServiceImplTest {
 
     private static final String BARCODE = "8800000000001";
+    private static final CartKey KEY = CartKey.of("S01", "01", "9001");
 
     private final ProductService productService = mock(ProductService.class);
     private final CartRepository cartRepository = mock(CartRepository.class);
@@ -62,11 +66,13 @@ class CartServiceImplTest {
     }
 
     @Test
-    @DisplayName("정상 상품은 true, 저장소에 담긴다")
-    void addItem_normalProduct_returnsTrue() {
+    @DisplayName("정상 상품은 저장소에 담고, 담은 뒤의 장바구니를 돌려준다")
+    void addItem_normalProduct_returnsCart() {
+        Cart cart = Cart.of(KEY, new LinkedHashMap<>());
         when(productService.findProduct(BARCODE)).thenReturn(product("normal"));
+        when(cartRepository.getCurrentCart(KEY)).thenReturn(cart);
 
-        assertThat(cartService.addItem(request())).isTrue();
+        assertThat(cartService.addItem(request())).isSameAs(cart);
         verify(cartRepository).addOrIncrease(any(), any());
     }
 
