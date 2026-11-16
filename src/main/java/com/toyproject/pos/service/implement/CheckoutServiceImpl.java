@@ -1,6 +1,7 @@
 package com.toyproject.pos.service.implement;
 
 import com.toyproject.pos.common.exception.AlreadyRefundedException;
+import com.toyproject.pos.common.exception.DuplicateTransactionException;
 import com.toyproject.pos.common.exception.EmptyCartException;
 import com.toyproject.pos.common.exception.UnsupportedPaymentMethodException;
 import com.toyproject.pos.common.exception.TransactionNotFoundException;
@@ -46,6 +47,11 @@ public class CheckoutServiceImpl implements CheckoutService {
     @Override
     @Transactional
     public SaleResDto checkOut(PaymentReqDto paymentReq) {
+        // 이미 결제된 거래번호면 거절. IMMEDIATE 트랜잭션이라 확인과 저장 사이에 다른 POS 가 끼어들 수 없음
+        // (SALES 의 UNIQUE 제약은 최후 방어선으로 남음)
+        if (checkoutRepository.existsTransaction(paymentReq.getKey()))
+            throw new DuplicateTransactionException();
+
         // 서비스 레이어는 결제 모델 생성
         Sale sale = saleModelBuilder(paymentReq);
 

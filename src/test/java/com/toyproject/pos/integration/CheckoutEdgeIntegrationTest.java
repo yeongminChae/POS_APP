@@ -1,10 +1,10 @@
 package com.toyproject.pos.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.toyproject.pos.common.exception.DuplicateTransactionException;
 import com.toyproject.pos.common.exception.TransactionNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.sqlite.SQLiteException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -110,8 +110,8 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 결제 완료된 tranNo 로 다시 담고 결제하면 UNIQUE 제약 위반(500), 장바구니는 남는다")
-    void reuseTranNoAfterCheckout_violatesUnique() throws Exception {
+    @DisplayName("결제 완료된 tranNo 로 다시 결제하면 DuplicateTransactionException(500), 저장 없음, 장바구니 유지")
+    void reuseTranNoAfterCheckout_isRejected() throws Exception {
         String tranNo = newTranNo();
         addItem(POS_1, tranNo, CHIPS);
         checkoutCash(POS_1, tranNo, 2000);
@@ -120,8 +120,8 @@ class CheckoutEdgeIntegrationTest extends PosApiTestSupport {
         assertThat(json(addItem(POS_1, tranNo, CHIPS)).get("status").asInt()).isEqualTo(200);
 
         assertThatThrownBy(() -> checkoutCash(POS_1, tranNo, 2000))
-                .hasRootCauseInstanceOf(SQLiteException.class)
-                .rootCause().hasMessageContaining("UNIQUE constraint failed: SALES.STORE_CD, SALES.POS_NO, SALES.TRAN_NO");
+                .hasRootCauseInstanceOf(DuplicateTransactionException.class)
+                .hasRootCauseMessage("이미 결제된 거래번호입니다.");
 
         assertThat(countSales(POS_1, tranNo)).isEqualTo(1);
         assertThat(json(getCart(POS_1, tranNo)).get("linesList")).hasSize(1); // 롤백되어 카트 유지
