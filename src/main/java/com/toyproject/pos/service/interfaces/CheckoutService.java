@@ -9,8 +9,6 @@ import com.toyproject.pos.domain.model.cart.CartSummary;
 
 public interface CheckoutService {
 
-//    Sale getSaleData(String posNo, String tranNo);
-
     CartSummary getSaleSummary(PaymentReqDto paymentReq);
 
     SaleResDto checkOut(PaymentReqDto paymentReq);

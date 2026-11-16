@@ -96,9 +96,8 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         checkoutRepository.save(refundSale);
         applyStock(refundSale);
-        SaleResDto saleResDto = SaleResDto.of(refundSale);
-
-        return saleResDto.withOriginSaleId(sale.getSaleId());
+        // origSaleId 는 SaleResDto.of 가 refundDetail 에서 채움
+        return SaleResDto.of(refundSale);
     }
 
     // 재고 반영: 정상 라인은 차감, 반품 라인은 수량이 음수라 같은 계산으로 복원, 취소 라인은 제외

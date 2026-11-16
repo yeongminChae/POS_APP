@@ -27,10 +27,6 @@ public interface CheckoutMapper {
                                  @Param("posNo") String posNo,
                                  @Param("tranNo") String tranNo);
 
-//    List<SaleLineRow> selectSaleLinesBySaleId(@Param("saleId") Long saleId);
-
-//    PaymentRow selectPaymentBySaleId(@Param("saleId") Long saleId);
-
     List<SaleLineRow> selectSaleLinesBySaleKey(@Param("storeCd") String storeCd,
                                                @Param("posNo") String posNo,
                                                @Param("tranNo") String tranNo);

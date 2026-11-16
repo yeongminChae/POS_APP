@@ -47,11 +47,4 @@ public class SaleResDto {
                 : null;
     }
 
-    public SaleResDto withOriginSaleId(Long saleId) {
-        return this.toBuilder()
-                .origSaleId(saleId)
-                .build();
-    }
-
 }
-

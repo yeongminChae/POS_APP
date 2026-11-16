@@ -187,34 +187,6 @@
           AND TRAN_NO = #{tranNo}
     </select>
 
-<!--    <select id="selectSaleLinesBySaleId" resultMap="SaleLineRowMap">-->
-<!--        SELECT SALE_LINE_ID,-->
-<!--               SALE_ID,-->
-<!--               LINE_NO,-->
-<!--               BARCODE,-->
-<!--               NAME,-->
-<!--               UNIT_PRICE,-->
-<!--               QTY,-->
-<!--               AMOUNT,-->
-<!--               ITEM_STATUS-->
-<!--        FROM SALE_LINES-->
-<!--        WHERE SALE_ID = #{saleId}-->
-<!--        ORDER BY LINE_NO ASC-->
-<!--    </select>-->
-
-<!--    <select id="selectPaymentBySaleId" resultMap="PaymentRowMap">-->
-<!--        SELECT PAYMENT_ID,-->
-<!--               SALE_ID,-->
-<!--               METHOD,-->
-<!--               STATUS,-->
-<!--               AMOUNT_DUE_TO_PAY,-->
-<!--               APPROVED_AT-->
-<!--        FROM PAYMENTS-->
-<!--        WHERE SALE_ID = #{saleId}-->
-<!--        ORDER BY APPROVED_AT DESC-->
-<!--        LIMIT 1-->
-<!--    </select>-->
-
     <select id="selectSaleLinesBySaleKey" resultMap="SaleLineRowMap">
         SELECT SALE_LINE_ID,
                SALE_ID,
