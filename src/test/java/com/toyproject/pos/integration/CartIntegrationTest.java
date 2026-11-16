@@ -5,9 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * 장바구니 API 의 현재 동작 고정. 버그로 보이는 동작은 [현재 동작/버그] 로 표시하고 그대로 기록한다.
@@ -28,13 +26,12 @@ class CartIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("판매중지 상품(…010)은 담을 수 없다 — HTTP 200 + 바디 status 404, 카트·재고 변화 없음")
+    @DisplayName("판매중지 상품(…010)은 담을 수 없다 — 409 PRODUCT_DISCONTINUED, 카트·재고 변화 없음")
     void discontinuedProduct_isRejected() throws Exception {
         String tranNo = newTranNo();
 
-        JsonNode res = json(addItem(POS_1, tranNo, DISCONTINUED));
+        error(addItem(POS_1, tranNo, DISCONTINUED), 409, "PRODUCT_DISCONTINUED");
 
-        assertThat(res.get("status").asInt()).isEqualTo(404);
         assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
         assertThat(stock("P010")).isZero();
     }
@@ -85,28 +82,24 @@ class CartIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 미등록 바코드: HTTP 200 + 바디 status 404, 카트 변화 없음")
-    void unknownBarcode_returns200WithBody404() throws Exception {
+    @DisplayName("미등록 바코드: 404 PRODUCT_NOT_FOUND, 카트 변화 없음")
+    void unknownBarcode_returns404() throws Exception {
         String tranNo = newTranNo();
 
-        JsonNode res = json(addItem(POS_1, tranNo, UNKNOWN).andExpect(status().isOk()));
+        JsonNode err = error(addItem(POS_1, tranNo, UNKNOWN), 404, "PRODUCT_NOT_FOUND");
 
-        assertThat(res.get("status").asInt()).isEqualTo(404);
-        assertThat(res.get("message").asText()).isEqualTo("미등록 상품");
+        assertThat(err.get("detail").asText()).isEqualTo("상품을 찾을 수 없습니다. barcode=" + UNKNOWN);
         assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 일괄 등록에 미등록 바코드가 섞이면 실패 응답이지만 나머지는 이미 담겨 있다")
-    void addMany_withUnknown_isPartiallyApplied() throws Exception {
+    @DisplayName("일괄 등록에 미등록 바코드가 섞이면 404 PRODUCT_NOT_FOUND, 아무것도 담지 않는다 (전부 아니면 전무)")
+    void addMany_withUnknown_addsNothing() throws Exception {
         String tranNo = newTranNo();
 
-        JsonNode res = json(addItems(POS_1, tranNo, CHIPS, UNKNOWN, CHOCO));
+        error(addItems(POS_1, tranNo, CHIPS, UNKNOWN, CHOCO), 404, "PRODUCT_NOT_FOUND");
 
-        assertThat(res.get("status").asInt()).isEqualTo(404);
-        assertThat(json(getCart(POS_1, tranNo)).get("linesList"))
-                .extracting(l -> l.get("barcode").asText())
-                .containsExactly(CHIPS, CHOCO);
+        assertThat(json(getCart(POS_1, tranNo)).get("linesList")).isEmpty();
     }
 
     // ===== 수량 변경 / 취소 =====
@@ -127,12 +120,11 @@ class CartIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("[현재 동작/버그] 수량 변경 요청에 qty 를 빼면 @Builder.Default 가 적용되지 않아 NPE(500)")
-    void updateQty_withoutQtyField_throwsNpe() {
+    @DisplayName("[현재 동작/버그] 수량 변경 요청에 qty 를 빼면 NPE → 500 INTERNAL_ERROR (B13, A6 요청 검증에서 400으로 바뀜)")
+    void updateQty_withoutQtyField_returns500() throws Exception {
         String tranNo = newTranNo();
 
-        assertThatThrownBy(() -> perform(post("/api/cart/item/update/qty"), with(key(POS_1, tranNo), "barcode", CHIPS)))
-                .hasRootCauseInstanceOf(NullPointerException.class);
+        error(perform(post("/api/cart/item/update/qty"), with(key(POS_1, tranNo), "barcode", CHIPS)), 500, "INTERNAL_ERROR");
     }
 
     @Test

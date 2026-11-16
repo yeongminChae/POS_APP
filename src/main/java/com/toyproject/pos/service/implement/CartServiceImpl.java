@@ -3,7 +3,6 @@ package com.toyproject.pos.service.implement;
 
 import com.toyproject.pos.common.exception.ProductDiscontinuedException;
 import com.toyproject.pos.common.exception.ProductNotFoundException;
-import com.toyproject.pos.common.exception.ProductNotSellableException;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.product.ProductQueryDto;
 import com.toyproject.pos.domain.dto.product.request.ProductReqDto;
@@ -17,6 +16,7 @@ import com.toyproject.pos.service.interfaces.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -40,37 +40,31 @@ public class CartServiceImpl implements CartService {
 
     // 상품 데이터 조회 + 조회 해온 결과 cart 모델에 담는 함수
     @Override
+    // 미등록·판매중지는 예외(ProductNotFoundException / ProductDiscontinuedException)로 알리고, 전역 처리기가 404 / 409로 응답
+    // 반환값은 A3(응답 형식 통일)에서 Cart 로 바뀔 때까지 항상 true
     public boolean addItem(ProductReqDto productReqDto) {
-        try {
-            // 상품 조회
-            ProductQueryDto productDto = getProduct(productReqDto.getBarcode());
-            // CartLine 객체 생성
-            CartLine cartLine = CartLine.of(productDto, 1);
+        // 상품 조회 + CartLine 생성
+        CartLine cartLine = toCartLine(productReqDto);
 
-            // 레포지토리에서 카트 모델에 추가 및 수량 증가
-            // 현재는 임시 저장소에 저장
-            CartKey cartKey = productReqDto.getKey();
-            cartRepository.addOrIncrease(cartKey, cartLine);
-            // 재고는 담을 때가 아니라 결제·반품 시점에 반영 (CheckoutServiceImpl)
+        // 레포지토리에서 카트 모델에 추가 및 수량 증가 (현재는 인메모리 저장소)
+        // 재고는 담을 때가 아니라 결제·반품 시점에 반영 (CheckoutServiceImpl)
+        cartRepository.addOrIncrease(productReqDto.getKey(), cartLine);
 
-            return true;
-
-        } catch (ProductNotSellableException ex) {
-            // 미등록·판매중지만 false. DB 오류 등 나머지 예외는 그대로 전파 (장애를 "미등록 상품"으로 숨기지 않음)
-            return false;
-
-        }
-
+        return true;
     }
 
     // 다중 상품 일괄 등록: 실패 상품이 있어도 나머지는 모두 담고, 전부 성공했을 때만 true
     @Override
+    // 전부 아니면 전무: 모든 상품을 먼저 조회·검사하고, 하나라도 실패하면 아무것도 담지 않고 예외
     public boolean addItems(List<ProductReqDto> productReqDtoList) {
-        int count = 0;
+        List<CartLine> cartLines = new ArrayList<>();
         for (ProductReqDto productReqDto : productReqDtoList)
-            count += (addItem(productReqDto) ? 1 : 0);
+            cartLines.add(toCartLine(productReqDto));
 
-        return count == productReqDtoList.size();
+        for (int i = 0; i < productReqDtoList.size(); i++)
+            cartRepository.addOrIncrease(productReqDtoList.get(i).getKey(), cartLines.get(i));
+
+        return true;
     }
 
     @Override
@@ -96,6 +90,10 @@ public class CartServiceImpl implements CartService {
     @Override
     public void clearCart(Sale sale) {
         cartRepository.clearCartStore(sale);
+    }
+
+    private CartLine toCartLine(ProductReqDto productReqDto) {
+        return CartLine.of(getProduct(productReqDto.getBarcode()), 1);
     }
 
     private ProductQueryDto getProduct(String barcode) {

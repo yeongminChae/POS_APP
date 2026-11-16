@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
@@ -116,6 +117,18 @@ abstract class PosApiTestSupport {
         return mvc.perform(builder
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(body)));
+    }
+
+    /**
+     * 오류 응답 검사: HTTP 상태, ProblemDetail 형식, 오류 코드. 바디(JsonNode)를 돌려줘서 detail 등을 더 검사할 수 있다.
+     */
+    JsonNode error(ResultActions result, int status, String code) throws Exception {
+        var response = result.andReturn().getResponse();
+        assertThat(response.getStatus()).isEqualTo(status);
+        assertThat(response.getContentType()).startsWith("application/problem+json");
+        JsonNode body = objectMapper.readTree(response.getContentAsString());
+        assertThat(body.get("code").asText()).isEqualTo(code);
+        return body;
     }
 
     JsonNode json(ResultActions result) throws Exception {

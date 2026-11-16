@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
@@ -149,31 +148,28 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("같은 원거래를 두 번 반품하면 IllegalStateException(500), 두 번째 반품은 저장되지 않는다")
+    @DisplayName("같은 원거래를 두 번 반품하면 409 ALREADY_REFUNDED, 두 번째 반품은 저장되지 않는다")
     void refundTwice_isRejected() throws Exception {
         String tranNo = paidSale(CHIPS);
 
         refund(POS_1, newTranNo(), POS_1, tranNo);
         String secondRefund = newTranNo();
 
-        assertThatThrownBy(() -> refund(POS_1, secondRefund, POS_1, tranNo))
-                .hasRootCauseInstanceOf(IllegalStateException.class)
-                .hasRootCauseMessage("이미 반품된 거래입니다.");
+        JsonNode err = error(refund(POS_1, secondRefund, POS_1, tranNo), 409, "ALREADY_REFUNDED");
+        assertThat(err.get("detail").asText()).isEqualTo("이미 반품된 거래입니다.");
         assertThat(countSales(POS_1, secondRefund)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM SALES WHERE ORIG_SALE_ID = ?", Integer.class,
                 saleId(POS_1, tranNo))).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("반품 거래(REFUNDED)를 다시 반품할 수 없다")
+    @DisplayName("반품 거래(REFUNDED)를 다시 반품하면 409 ALREADY_REFUNDED")
     void refundOfRefund_isRejected() throws Exception {
         String tranNo = paidSale(CHIPS);
         String refundTranNo = newTranNo();
         refund(POS_1, refundTranNo, POS_1, tranNo);
 
-        assertThatThrownBy(() -> refund(POS_1, newTranNo(), POS_1, refundTranNo))
-                .hasRootCauseInstanceOf(IllegalStateException.class)
-                .hasRootCauseMessage("이미 반품된 거래입니다.");
+        error(refund(POS_1, newTranNo(), POS_1, refundTranNo), 409, "ALREADY_REFUNDED");
     }
 
     @Test
@@ -272,7 +268,7 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
     }
 
     @Test
-    @DisplayName("반품 저장 중 한 단계라도 실패하면 반품 전체가 롤백된다 (트리거로 CASH_PAYMENTS 단계 실패 주입)")
+    @DisplayName("반품 저장 중 한 단계라도 실패하면 반품 전체가 롤백되고 500 INTERNAL_ERROR (트리거로 CASH_PAYMENTS 단계 실패 주입)")
     void refund_isAtomic() throws Exception {
         String tranNo = paidSale(CHIPS);
         String refundTranNo = newTranNo();
@@ -281,8 +277,10 @@ class CheckoutScenarioIntegrationTest extends PosApiTestSupport {
         jdbc.execute("CREATE TRIGGER fail_refund_cash BEFORE INSERT ON CASH_PAYMENTS "
                 + "WHEN NEW.AMOUNT_RECEIVED < 0 BEGIN SELECT RAISE(ABORT, 'injected failure'); END");
         try {
-            assertThatThrownBy(() -> refund(POS_1, refundTranNo, POS_1, tranNo))
-                    .rootCause().hasMessageContaining("injected failure");
+            // 예상하지 못한 오류는 500 INTERNAL_ERROR, 내부 메시지는 응답에 노출하지 않음
+            JsonNode err = error(refund(POS_1, refundTranNo, POS_1, tranNo), 500, "INTERNAL_ERROR");
+            assertThat(err.get("detail").asText()).isEqualTo("서버 오류가 발생했습니다.");
+            assertThat(err.toString()).doesNotContain("injected failure").doesNotContain("SQLITE");
         } finally {
             jdbc.execute("DROP TRIGGER IF EXISTS fail_refund_cash");
         }

@@ -1,5 +1,7 @@
 package com.toyproject.pos.service.implement;
 
+import com.toyproject.pos.common.exception.ProductDiscontinuedException;
+import com.toyproject.pos.common.exception.ProductNotFoundException;
 import com.toyproject.pos.domain.dto.cart.request.CartInfoReqDto;
 import com.toyproject.pos.domain.dto.product.ProductQueryDto;
 import com.toyproject.pos.domain.dto.product.request.ProductReqDto;
@@ -42,20 +44,20 @@ class CartServiceImplTest {
     }
 
     @Test
-    @DisplayName("미등록 상품은 false (기존 동작 유지)")
-    void addItem_unknownProduct_returnsFalse() {
+    @DisplayName("미등록 상품은 ProductNotFoundException (전역 처리기가 404로 응답)")
+    void addItem_unknownProduct_throwsNotFound() {
         when(productService.findProduct(BARCODE)).thenReturn(null);
 
-        assertThat(cartService.addItem(request())).isFalse();
+        assertThatThrownBy(() -> cartService.addItem(request())).isInstanceOf(ProductNotFoundException.class);
         verify(cartRepository, never()).addOrIncrease(any(), any());
     }
 
     @Test
-    @DisplayName("판매중지 상품은 false (B12b 동작 유지)")
-    void addItem_discontinuedProduct_returnsFalse() {
+    @DisplayName("판매중지 상품은 ProductDiscontinuedException (전역 처리기가 409로 응답)")
+    void addItem_discontinuedProduct_throwsDiscontinued() {
         when(productService.findProduct(BARCODE)).thenReturn(product("discontinued"));
 
-        assertThat(cartService.addItem(request())).isFalse();
+        assertThatThrownBy(() -> cartService.addItem(request())).isInstanceOf(ProductDiscontinuedException.class);
         verify(cartRepository, never()).addOrIncrease(any(), any());
     }
 

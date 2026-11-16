@@ -58,13 +58,10 @@ public class CartController {
 
     }
 
-    // 상품 추가 결과 응답 (HTTP 200 고정, 바디 status로 성공/미등록 구분)
+    // 상품 추가 성공 응답. 실패(미등록·판매중지)는 예외로 전역 처리기가 404 / 409로 응답
+    // (응답 바디는 A3 응답 형식 통일 때 변경 후 장바구니로 바뀜)
     private static ResponseEntity<ApiResponseDto> toAddItemResponse(boolean result) {
-        return ResponseEntity.ok(new ApiResponseDto(
-                        result ? "상품 추가 성공" : "미등록 상품",
-                        result ? HttpStatus.OK.value() : HttpStatus.NOT_FOUND.value()
-                )
-        );
+        return ResponseEntity.ok(new ApiResponseDto("상품 추가 성공", HttpStatus.OK.value()));
     }
 
 }

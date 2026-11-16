@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -90,20 +91,21 @@ class ConcurrentPosIntegrationTest extends PosApiTestSupport {
                 String refund2 = newTranNo();
 
                 CountDownLatch start = new CountDownLatch(1);
-                Future<Throwable> a = pool.submit(awaiting(start, () -> failureOf(() -> refund(POS_1, refund1, POS_1, original))));
-                Future<Throwable> b = pool.submit(awaiting(start, () -> failureOf(() -> refund(POS_2, refund2, POS_1, original))));
+                Future<MvcResult> a = pool.submit(awaiting(start, () -> refund(POS_1, refund1, POS_1, original).andReturn()));
+                Future<MvcResult> b = pool.submit(awaiting(start, () -> refund(POS_2, refund2, POS_1, original).andReturn()));
                 start.countDown();
 
-                List<Throwable> failures = new ArrayList<>();
-                for (Future<Throwable> f : List.of(a, b)) {
-                    Throwable t = f.get(30, TimeUnit.SECONDS);
-                    if (t != null) failures.add(t);
+                List<Integer> statuses = new ArrayList<>();
+                MvcResult rejected = null;
+                for (Future<MvcResult> f : List.of(a, b)) {
+                    MvcResult r = f.get(30, TimeUnit.SECONDS);
+                    statuses.add(r.getResponse().getStatus());
+                    if (r.getResponse().getStatus() != 200) rejected = r;
                 }
 
-                assertThat(failures).hasSize(1);
-                assertThat(rootCause(failures.get(0)))
-                        .isInstanceOf(IllegalStateException.class)
-                        .hasMessage("이미 반품된 거래입니다.");
+                assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+                assertThat(objectMapper.readTree(rejected.getResponse().getContentAsString()).get("code").asText())
+                        .isEqualTo("ALREADY_REFUNDED");
                 assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM SALES WHERE ORIG_SALE_ID = ?", Integer.class,
                         saleId(POS_1, original))).isEqualTo(1);
             }
@@ -155,20 +157,6 @@ class ConcurrentPosIntegrationTest extends PosApiTestSupport {
                 assertThat(lines.get(0).get("qty").asInt()).isEqualTo(1);
             }
         }
-    }
-
-    private static Throwable failureOf(Callable<?> call) {
-        try {
-            call.call();
-            return null;
-        } catch (Throwable t) {
-            return t;
-        }
-    }
-
-    private static Throwable rootCause(Throwable t) {
-        while (t.getCause() != null && t.getCause() != t) t = t.getCause();
-        return t;
     }
 
     /** 결제 1건과 현금 상세 1건이 같은 PAYMENT_ID 로 연결되어 있는지 */
