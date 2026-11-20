@@ -18,9 +18,20 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * DB 행(Row) → 도메인 모델 조립기 (조회 방향 전용, 정적 메서드만 있음).
+ *
+ * <p>거래 조회·반품 시 저장소({@code CheckoutRepositoryImpl})가 사용한다. 복원은 저장된 값을 그대로 쓰고
+ * 생성 시의 검증·계산을 다시 하지 않는다 (예: 반품 결제의 음수 금액, 저장된 합계).
+ * 저장 방향(도메인 → Row)은 각 Row 클래스의 {@code of(...)}가 맡는다.</p>
+ */
 public final class SaleRowMapper {
 
     // 거래 호출 시, 로우 -> Sale 도메인 매핑
+    /**
+     * SALES 행 + 복원한 장바구니 요약·결제 → {@link Sale}.
+     * 반품 거래면 원거래 ID 를 담은 반품 상세도 채운다.
+     */
     public static Sale toSale(
             SaleRow saleRow,
             CartSummary summary,
@@ -49,10 +60,17 @@ public final class SaleRowMapper {
                 : null;
     }
 
+    /** SALE_LINES 행들 → {@link Cart}. 라인 번호를 lineId 로 써서 저장 당시 순서·번호를 그대로 살린다. */
     public static Cart getCartTransaction(CartKey cartKey, List<SaleLineRow> lineRows) {
         return Cart.of(cartKey, getLineMap(lineRows));
     }
 
+    /**
+     * PAYMENTS 행(+ CASH_PAYMENTS 행) → {@link Payment}. 결제 수단에 따라 구현체를 고른다.
+     * 카드는 미구현이라 null 을 돌려준다 (카드 결제는 저장 자체가 막혀 있어 실제로는 도달하지 않음).
+     *
+     * @param cashRow 현금 상세 (현금이 아니면 null)
+     */
     public static Payment getPaymentSummary(
             CartKey cartKey,
             PaymentRow paymentRow,
@@ -76,6 +94,7 @@ public final class SaleRowMapper {
 
     }
 
+    /** PAYMENTS 행 → 결제 공통 정보 */
     private static CommonPaymentData getCommonPaymentData(CartKey cartKey, PaymentRow paymentRow) {
         return CommonPaymentData.restoredOf(
                 paymentRow.getPaymentId(),
@@ -86,6 +105,7 @@ public final class SaleRowMapper {
         );
     }
 
+    /** 라인 번호 → 라인 맵 (조회 순서 = 라인 번호 순 유지) */
     private static Map<String, CartLine> getLineMap(List<SaleLineRow> lineRows) {
         Map<String, CartLine> lineMap = new LinkedHashMap<>();
 
@@ -95,6 +115,7 @@ public final class SaleRowMapper {
         return lineMap;
     }
 
+    /** SALE_LINES 행 1개 → 장바구니 라인. 상품 ID 는 SALE_LINES 에 없어서 null (재고 반영은 바코드로 하므로 문제없음) */
     public static CartLine getCartLine(SaleLineRow saleLineRow) {
         return CartLine.builder()
                 .productId(null)                    // 저장 안 했다면 null 가능
@@ -109,4 +130,3 @@ public final class SaleRowMapper {
     }
 
 }
-

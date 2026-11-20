@@ -28,6 +28,11 @@ import java.util.List;
  *   <li>요청 형식 오류(깨진 JSON, 없는 enum 값): 400 MALFORMED_REQUEST</li>
  *   <li>그 외: 500 INTERNAL_ERROR. 내부 메시지는 응답에 넣지 않고 로그로만 남긴다</li>
  * </ul>
+ *
+ * <p>{@code ResponseEntityExceptionHandler}를 상속해 Spring MVC 기본 예외(검증 실패, 깨진 JSON, 없는 경로 404 등)도
+ * ProblemDetail 로 응답하게 하고, 그중 검증·형식 오류에만 {@code code}를 붙인다 (없는 경로 404 는 code 없음).</p>
+ * <p>새 업무 오류를 추가할 때: {@link ErrorCode}에 코드를 넣고, {@code common/exception}에 {@link HasErrorCode}를 구현한
+ * 예외를 만들어 던지면 이 처리기를 고치지 않아도 된다.</p>
  */
 @Slf4j
 @RestControllerAdvice
@@ -39,6 +44,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     // 요청 DTO 들이 @JsonUnwrapped 로 포함하는 거래 키(CartInfoReqDto) 필드 이름
     private static final String UNWRAPPED_KEY_FIELD = "cartInfoReqDto";
 
+    /**
+     * 나머지 모든 예외의 최종 처리.
+     * 업무 예외({@link HasErrorCode})면 그 코드의 상태(400/404/409)와 예외 메시지로 응답하고,
+     * 그 외(예상하지 못한 오류)는 원인을 ERROR 로그로 남긴 뒤 500 + 고정 메시지로 응답한다 (내부 정보 노출 방지).
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handle(Exception ex) {
         if (ex instanceof HasErrorCode hasErrorCode)
@@ -60,6 +70,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     // Spring MVC 기본 예외(ResponseEntityExceptionHandler 가 처리)에 code 와 한국어 detail 을 붙인다
+    /**
+     * 부모가 만든 ProblemDetail 을 고친다.
+     * 단건 바디·쿼리 파라미터 검증 실패(MethodArgumentNotValidException) → 400 VALIDATION_FAILED + errors[],
+     * 깨진 JSON·없는 enum 값(HttpMessageNotReadableException) → 400 MALFORMED_REQUEST.
+     */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, @Nullable Object body, HttpHeaders headers,
                                                              HttpStatusCode statusCode, WebRequest request) {
@@ -97,6 +112,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return normalized.startsWith(".") ? normalized.substring(1) : normalized;
     }
 
+    /** 오류 코드의 HTTP 상태와 detail 로 ProblemDetail 응답을 만들고 {@code code} 속성을 붙인다. */
     private static ResponseEntity<ProblemDetail> problem(ErrorCode errorCode, String detail) {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(errorCode.status(), detail);
         problemDetail.setProperty(CODE, errorCode.name());
